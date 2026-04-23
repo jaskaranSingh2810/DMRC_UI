@@ -1,0 +1,77 @@
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: "Poppins", sans-serif;
+  background-color: #f5f7fa;
+  color: #1f2937;
+  margin: 0;
+  padding: 0;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: #94a3b8;
+}
+
+@layer components {
+  .card {
+    @apply bg-white p-5 rounded-xl border shadow-card;
+  }
+
+  .stat-card {
+    @apply bg-white p-5 rounded-xl border shadow-card flex justify-between items-center;
+  }
+
+  .btn-primary {
+    @apply bg-primary text-white px-4 py-2 rounded-md hover:bg-[#092f59] transition;
+  }
+
+  .btn-outline-blue {
+    @apply border border-blue-300 text-blue-600 px-3 py-1 rounded-md hover:bg-blue-50;
+  }
+
+  .btn-outline-red {
+    @apply border border-red-300 text-red-600 px-3 py-1 rounded-md hover:bg-red-50;
+  }
+
+  .table-header {
+    @apply bg-gray-100 text-gray-600 text-sm font-medium;
+  }
+
+  .table-cell {
+    @apply px-4 py-3;
+  }
+
+  .status-badge {
+    @apply px-3 py-1 rounded-full text-xs font-medium;
+  }
+
+  .status-live {
+    @apply bg-green-100 text-green-600;
+  }
+
+  .status-expired {
+    @apply bg-red-100 text-red-600;
+  }
+
+  .status-scheduled {
+    @apply bg-yellow-100 text-yellow-600;
+  }
+
+  .status-inactive {
+    @apply bg-gray-100 text-gray-600;
+  }
+}

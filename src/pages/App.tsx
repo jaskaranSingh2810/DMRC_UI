@@ -1,0 +1,151 @@
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { useEffect } from "react";
+import { UserRole } from "@/types";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { fetchProfile } from "@/store/slices/authSlice";
+
+import DashboardLayout from "@/layout/DashboardLayout";
+import ProtectedRoute from "./ProtectedRoute";
+
+import Dashboard from "./Dashboard";
+import Login from "./Login";
+import NoticeManagement from "./NoticeManagement/NoticeManagement";
+import TickerManagement from "./TickerManagement/TickerManagement";
+import Unauthorized from "./Unauthorized";
+import AdsManagement from "./AdsManagement/AdsManagement";
+import DeviceManagement from "./DeviceManagement/DeviceManagement";
+import UserManagement from "./UserManagement/UserManagement";
+import Support from "./Support";
+import CreateNewAd from "./AdsManagement/CreateNewAd";
+import CreateNotice from "./NoticeManagement/CreateNotice";
+import CreateTicker from "./TickerManagement/CreateTicker";
+import ForgotPassword from "./ForgotPassword";
+import ResetPassword from "./ResetPassword";
+
+export default function App() {
+  const dispatch = useAppDispatch();
+  const user = useAppSelector((state) => state.auth.user);
+
+  useEffect(() => {
+    if (user?.accessToken && !user.profile) {
+      void dispatch(fetchProfile());
+    }
+  }, [dispatch, user?.accessToken, user?.profile]);
+
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/unauthorized" element={<Unauthorized />} />
+
+        <Route
+          element={
+            <ProtectedRoute
+              allowedRoles={[
+                UserRole.SUPER_ADMIN,
+                UserRole.AD_MANAGER,
+                UserRole.NOTICE_MANAGER,
+                UserRole.TICKER_MANAGER,
+              ]}
+            >
+              <DashboardLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="/dashboard" element={<Dashboard />} />
+
+          <Route
+            path="/ads-management"
+            element={
+              <ProtectedRoute
+                allowedRoles={[UserRole.SUPER_ADMIN, UserRole.AD_MANAGER]}
+              >
+                <AdsManagement />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/ads-management/create"
+            element={
+              <ProtectedRoute
+                allowedRoles={[UserRole.SUPER_ADMIN, UserRole.AD_MANAGER]}
+              >
+                <CreateNewAd />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/notice-management"
+            element={
+              <ProtectedRoute
+                allowedRoles={[UserRole.SUPER_ADMIN, UserRole.NOTICE_MANAGER]}
+              >
+                <NoticeManagement />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/notice-management/create"
+            element={
+              <ProtectedRoute
+                allowedRoles={[UserRole.SUPER_ADMIN, UserRole.NOTICE_MANAGER]}
+              >
+                <CreateNotice />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/ticker-management"
+            element={
+              <ProtectedRoute
+                allowedRoles={[UserRole.SUPER_ADMIN, UserRole.TICKER_MANAGER]}
+              >
+                <TickerManagement />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/ticker-management/create"
+            element={
+              <ProtectedRoute
+                allowedRoles={[UserRole.SUPER_ADMIN, UserRole.TICKER_MANAGER]}
+              >
+                <CreateTicker />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/device-management"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.SUPER_ADMIN]}>
+                <DeviceManagement />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/user-management"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.SUPER_ADMIN]}>
+                <UserManagement />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route path="/support" element={<Support />} />
+        </Route>
+
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
