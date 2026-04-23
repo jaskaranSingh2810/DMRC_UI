@@ -7,6 +7,7 @@ import {
   setSelectedLocationId,
 } from "@/store/slices/deviceSlice";
 import { fetchLocations } from "@/store/slices/locationSlice";
+import { setSelectedModule } from "@/store/slices/userSlice";
 import { useModal } from "./ModalContext";
 
 type HeaderAction =
@@ -79,13 +80,17 @@ export default function Header({
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const isDeviceManagementPage = pathname === "/device-management";
+  const isUserManagementPage = pathname === "/user-management";
   const [locationMenuOpen, setLocationMenuOpen] = useState(false);
+  const [moduleMenuOpen, setModuleMenuOpen] = useState(false);
   const locationMenuRef = useRef<HTMLDivElement | null>(null);
+  const moduleMenuRef = useRef<HTMLDivElement | null>(null);
   const { loading, selectedLocationId } = useAppSelector(
     (state) => state.devices,
   );
   const { items: locationList, listLoaded: locationListLoaded } =
     useAppSelector((state) => state.locations);
+  const { items: users, selectedModule } = useAppSelector((state) => state.users);
 
   const config = Object.entries(headerConfig).find(
     ([key]) => pathname === key || pathname.startsWith(key + "/"),
@@ -105,6 +110,13 @@ export default function Header({
       ) {
         setLocationMenuOpen(false);
       }
+
+      if (
+        moduleMenuRef.current &&
+        !moduleMenuRef.current.contains(event.target as Node)
+      ) {
+        setModuleMenuOpen(false);
+      }
     };
 
     document.addEventListener("mousedown", handleClickOutside);
@@ -115,6 +127,17 @@ export default function Header({
     locationList.find(
       (location) => String(location.locationId) === String(selectedLocationId),
     )?.locationName ?? "All Locations";
+  const availableModules = Array.from(
+    new Set(
+      users.flatMap((user) =>
+        (user.moduleAccess ?? [])
+          .map((moduleName) => moduleName.trim())
+          .filter(Boolean),
+      ),
+    ),
+  ).sort((left, right) => left.localeCompare(right));
+  const selectedModuleLabel =
+    selectedModule === "all" ? "All Modules" : selectedModule;
 
   const handleAction = () => {
     if (!config.action) return;
@@ -229,6 +252,70 @@ export default function Header({
               <Download size={16} absoluteStrokeWidth={true} />
             </button>
           </>
+        ) : null}
+
+        {isUserManagementPage ? (
+          <div ref={moduleMenuRef} className="relative">
+            <button
+              type="button"
+              onClick={() => setModuleMenuOpen((current) => !current)}
+              className="flex min-w-[170px] items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-[6px] text-[14px] font-semibold text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              aria-haspopup="listbox"
+              aria-expanded={moduleMenuOpen}
+            >
+              <span>{selectedModuleLabel}</span>
+              <ChevronDown
+                size={16}
+                className={`text-[#5E1B7F] transition ${
+                  moduleMenuOpen ? "rotate-180" : ""
+                }`}
+              />
+            </button>
+
+            {moduleMenuOpen ? (
+              <div className="absolute right-0 top-[calc(100%+0.35rem)] z-30 min-w-[170px] overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg">
+                <button
+                  type="button"
+                  onClick={() => {
+                    dispatch(setSelectedModule("all"));
+                    setModuleMenuOpen(false);
+                  }}
+                  className={`flex w-full items-center gap-3 px-4 py-3 text-sm transition ${
+                    selectedModule === "all"
+                      ? "bg-[#F4ECFA] text-[#7C3AA8]"
+                      : "bg-white text-[#333333] hover:bg-slate-50"
+                  }`}
+                  role="option"
+                  aria-selected={selectedModule === "all"}
+                >
+                  <span>All Modules</span>
+                </button>
+                {availableModules.map((moduleName) => {
+                  const isSelected = selectedModule === moduleName;
+
+                  return (
+                    <button
+                      key={moduleName}
+                      type="button"
+                      onClick={() => {
+                        dispatch(setSelectedModule(moduleName));
+                        setModuleMenuOpen(false);
+                      }}
+                      className={`flex w-full items-center gap-3 px-4 py-3 text-sm transition ${
+                        isSelected
+                          ? "bg-[#F4ECFA] text-[#7C3AA8]"
+                          : "bg-white text-[#333333] hover:bg-slate-50"
+                      }`}
+                      role="option"
+                      aria-selected={isSelected}
+                    >
+                      <span>{moduleName}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
+          </div>
         ) : null}
 
         {config.action && (

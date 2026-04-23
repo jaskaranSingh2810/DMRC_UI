@@ -42,6 +42,8 @@ type DeviceActionState =
     }
   | null;
 
+type DeviceStatFilter = "all" | "active" | "inactive" | "not_working";
+
 function StatusBadge({ status }: StatusBadgeProps) {
   const normalizedStatus = status.toLowerCase();
   const styles: Record<string, string> = {
@@ -140,6 +142,8 @@ export default function DeviceManagement() {
   const [editingDevice, setEditingDevice] = useState<DeviceRecord | null>(null);
   const [deviceAction, setDeviceAction] = useState<DeviceActionState>(null);
   const [removeRemarks, setRemoveRemarks] = useState("");
+  const [selectedStatFilter, setSelectedStatFilter] =
+    useState<DeviceStatFilter>("all");
 
   useEffect(() => {
     if (!listLoaded) {
@@ -195,7 +199,7 @@ export default function DeviceManagement() {
   }, [dispatch, error, toast]);
 
   const filteredDevices = useMemo(() => {
-    return items.filter((device) =>
+    const devicesMatchingTableFilters = items.filter((device) =>
       Object.entries(filters).every(([key, value]) => {
         if (!value) {
           return true;
@@ -210,7 +214,15 @@ export default function DeviceManagement() {
         return String(rawValue).toLowerCase().includes(normalizedFilter);
       }),
     );
-  }, [filters, items]);
+
+    if (selectedStatFilter === "all") {
+      return devicesMatchingTableFilters;
+    }
+
+    return devicesMatchingTableFilters.filter(
+      (device) => normalizeDeviceStatus(device.status) === selectedStatFilter,
+    );
+  }, [filters, items, selectedStatFilter]);
 
   const activeDeviceCount = useMemo(
     () =>
@@ -244,6 +256,24 @@ export default function DeviceManagement() {
       setPage(totalPages);
     }
   }, [page, totalPages]);
+
+  useEffect(() => {
+    setSelectedStatFilter("all");
+  }, [selectedLocationId]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [selectedStatFilter]);
+
+  const handleStatCardClick = (nextFilter: DeviceStatFilter) => {
+    setSelectedStatFilter((current) => {
+      if (nextFilter === "all") {
+        return "all";
+      }
+
+      return current === nextFilter ? "all" : nextFilter;
+    });
+  };
 
   const columns = [
     {
@@ -336,16 +366,6 @@ export default function DeviceManagement() {
 
   return (
     <div className="space-y-6">
-      {/* <section className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-        <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-blue-700">
-            Live device controls
-          </p>
-          <h2 className="mt-3 text-3xl font-bold tracking-tight text-slate-900">
-            Monitor and update field devices
-          </h2>
-        </div>
-      </section> */}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
@@ -353,24 +373,32 @@ export default function DeviceManagement() {
           value={String(items.length)}
           accent="violet"
           icon={<Monitor size={22} />}
+          isActive={selectedStatFilter === "all"}
+          onClick={() => handleStatCardClick("all")}
         />
         <StatCard
           label="Active Devices"
           value={String(activeDeviceCount)}
           accent="green"
           icon={<CheckCircle2 size={22} />}
+          isActive={selectedStatFilter === "active"}
+          onClick={() => handleStatCardClick("active")}
         />
         <StatCard
           label="Inactive Devices"
           value={String(inactiveDeviceCount)}
           accent="slate"
           icon={<AlertTriangle size={22} />}
+          isActive={selectedStatFilter === "inactive"}
+          onClick={() => handleStatCardClick("inactive")}
         />
         <StatCard
           label="Not working Devices"
           value={String(notWorkingDeviceCount)}
           accent="red"
           icon={<XCircle size={22} />}
+          isActive={selectedStatFilter === "not_working"}
+          onClick={() => handleStatCardClick("not_working")}
         />
       </div>
 
@@ -558,15 +586,19 @@ function StatCard({
   value,
   icon,
   accent,
+  isActive,
+  onClick,
 }: {
   label: string;
   value: string;
   icon: ReactNode;
   accent: "violet" | "green" | "slate" | "red";
+  isActive: boolean;
+  onClick: () => void;
 }) {
   const accentStyles = {
     violet: {
-      card: "border-[#5E1B7F]",
+      card: "border-violet-100",
       tile: "bg-violet-100 text-violet-700",
     },
     green: {
@@ -584,8 +616,12 @@ function StatCard({
   } as const;
 
   return (
-    <div
-      className={`flex items-center justify-between rounded-[8px] border bg-white px-5 py-4 shadow-[rgba(0, 0, 0, 0.05)] ${accentStyles[accent].card}`}
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      aria-pressed={isActive}
+      className={`flex items-center justify-between rounded-[8px] border bg-white px-5 py-4 text-left shadow-[rgba(0, 0, 0, 0.05)] transition ${isActive ? "border-[#5E1B7F] ring-2 ring-[#5E1B7F1F]" : accentStyles[accent].card}`}
     >
       <div>
         <p className="text-[16px] font-medium text-slate-700">{label}</p>
@@ -598,7 +634,7 @@ function StatCard({
       >
         {icon}
       </div>
-    </div>
+    </button>
   );
 }
 

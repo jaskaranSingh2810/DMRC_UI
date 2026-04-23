@@ -121,7 +121,7 @@ export default function Sidebar({
               </div>
             </div>
 
-            <nav className="mt-4 space-y-1 px-2">
+            <nav className="mt-4 space-y-4 px-2">
               {menus.map((menu) => (
                 <MenuItemComponent
                   key={menu.path[0]}

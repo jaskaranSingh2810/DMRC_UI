@@ -126,12 +126,35 @@ export interface Ad {
   contentName: string;
   createdBy: string;
   publishedOn?: string | null;
+  createdAt?: string | null;
   startDate?: string | null;
   endDate?: string | null;
   locations?: AdLocation[];
+  locationName?: string;
   startTime?: string | null;
   endTime?: string | null;
   status: EntityStatus | string;
+  remarks?: string | null;
+  updatedAt?: string | null;
+  updatedBy?: string | null;
+  deleted?: boolean;
+}
+
+export interface ManagedUserRecord {
+  id: string | number;
+  empId: string;
+  employeeName: string;
+  emailId: string;
+  mobileNumber: string;
+  password?: string | null;
+  locationAccess?: string[] | null;
+  moduleAccess?: string[] | null;
+  lastLoggedIn?: string | null;
+  createdOn?: string | null;
+  createdBy?: string | null;
+  status: string;
+  updatedAt?: string | null;
+  updatedBy?: string | null;
 }
 
 export interface ApiEnvelope<TData> {

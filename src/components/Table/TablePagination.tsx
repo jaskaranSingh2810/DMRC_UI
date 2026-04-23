@@ -35,10 +35,10 @@ export default function TablePagination({
         type="button"
         disabled={currentPage === 1}
         onClick={() => onPageChange?.(currentPage - 1)}
-        className="flex h-8 w-8 items-center justify-center rounded-[2px] border border-[#E6E6E6] text-[#D2D2D7] transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-[#E6E6E6]"
+        className="flex h-8 w-8 items-center justify-center rounded-[2px] border border-[#5E1B7F] text-[#5E1B7F] transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-[#E6E6E6] disabled:border-[#E6E6E6]"
         aria-label="Previous page"
       >
-        <ChevronLeft size={24} strokeWidth={2.2} color="#E6E6E6" />
+        <ChevronLeft size={24} strokeWidth={2.2} />
       </button>
 
       <div className="flex items-center gap-5">
@@ -78,10 +78,10 @@ export default function TablePagination({
         type="button"
         disabled={currentPage === normalizedTotalPages}
         onClick={() => onPageChange?.(currentPage + 1)}
-        className="flex h-8 w-8 items-center justify-center rounded-[2px] border border-[#6D2C91] text-[#6D2C91] transition hover:bg-[#F8F1FD] disabled:cursor-not-allowed disabled:border-[#E6E6E6] disabled:text-[#E6E6E6]"
+        className="flex h-8 w-8 items-center justify-center rounded-[2px] border border-[#5E1B7F] text-[#5E1B7F] transition hover:bg-[#F8F1FD] disabled:cursor-not-allowed disabled:border-[#E6E6E6] disabled:text-[#E6E6E6]"
         aria-label="Next page"
       >
-        <ChevronRight size={24} strokeWidth={2.2} color="#E6E6E6" />
+        <ChevronRight size={24} strokeWidth={2.2} />
       </button>
     </div>
   );
