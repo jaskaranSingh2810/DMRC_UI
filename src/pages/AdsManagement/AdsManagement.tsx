@@ -177,7 +177,7 @@ export default function AdsManagement() {
   }, [dispatch, error, toast]);
 
   const filteredAds = useMemo(() => {
-    const adsMatchingTableFilters = items.filter((ad) =>
+    const adsMatchingTableFilters = items.filter((ad: any) =>
       Object.entries(filters).every(([key, value]) => {
         if (!value) {
           return true;
