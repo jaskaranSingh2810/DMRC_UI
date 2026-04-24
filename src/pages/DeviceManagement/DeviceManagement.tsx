@@ -298,8 +298,10 @@ export default function DeviceManagement() {
       key: "createdAt",
       filterable: true,
       sortable: true,
-      render: (row: DeviceRecord) =>
-        new Date(row.createdAt).toLocaleDateString("en-GB"),
+      render: (row: DeviceRecord) =>{
+        const d = new Date(row.createdAt);
+        return d.toISOString().split("T")[0];
+      }
     },
 
     {
