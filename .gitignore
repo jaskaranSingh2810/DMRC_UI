@@ -23,5 +23,6 @@ Thumbs.db
 *.ntvs*
 *.njsproj
 *.sln
+*.md
 
 package-lock.json

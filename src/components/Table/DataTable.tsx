@@ -9,6 +9,31 @@ function getValue(obj: any, path: string) {
   return path.split(".").reduce((acc, key) => acc?.[key], obj);
 }
 
+function getRowKey<T>(row: T, rowIndex: number): string | number {
+  if (row && typeof row === "object") {
+    const record = row as Record<string, unknown>;
+    const candidateKeys = [
+      "id",
+      "contentId",
+      "empId",
+      "deviceCode",
+      "noticeId",
+      "tickerId",
+      "locationId",
+    ];
+
+    for (const key of candidateKeys) {
+      const value = record[key];
+
+      if (typeof value === "string" || typeof value === "number") {
+        return value;
+      }
+    }
+  }
+
+  return rowIndex;
+}
+
 export default function DataTable<T>({
   data = [],
   columns,
@@ -131,7 +156,7 @@ export default function DataTable<T>({
           className={`w-full overflow-x-auto scroll-smooth rounded-[8px] touch-pan-x
             ${isDragging ? "cursor-grabbing select-none" : "cursor-grab"}`}
         >
-          <div className="min-w-[900px]">
+          <div className="relative min-w-[900px]">
             <table className="w-full text-xs sm:text-sm ">
               <thead className="sticky top-0 z-20 text-[#333333] shadow-sm">
                 <tr>
@@ -152,7 +177,7 @@ export default function DataTable<T>({
                               onClick={() => onSort?.(String(col.key))}
                               className={`rounded-full p-2 transition ${
                                 sortState?.key === String(col.key)
-                                  ? "bg-blue-100 text-[#4e146a]"
+                                  ? "bg-white text-[#4e146a]"
                                   : "text-[#5E1B7F] hover:bg-slate-100 hover:text-slate-700"
                               }`}
                               aria-label={`Sort ${col.label}`}
@@ -181,7 +206,7 @@ export default function DataTable<T>({
                                 }}
                                 className={`rounded-full p-2 transition ${
                                   filterDrafts[String(col.key)]
-                                    ? "bg-blue-100 text-[#5E1B7F]"
+                                    ? "bg-white text-[#5E1B7F]"
                                     : "text-[#5E1B7F] hover:bg-slate-100 hover:text-slate-700"
                                 }`}
                                 aria-label={`Filter ${col.label}`}
@@ -198,7 +223,7 @@ export default function DataTable<T>({
               </thead>
 
               <tbody>
-                {loading ? (
+                {loading && data.length === 0 ? (
                   <tr>
                     <td
                       colSpan={columns.length}
@@ -219,7 +244,7 @@ export default function DataTable<T>({
                 ) : (
                   data.map((row, rowIndex) => (
                     <tr
-                      key={rowIndex}
+                      key={getRowKey(row, rowIndex)}
                       className="border-t border-slate-200 transition hover:bg-slate-50/70"
                     >
                       {columns.map((col) => (
@@ -237,6 +262,14 @@ export default function DataTable<T>({
                 )}
               </tbody>
             </table>
+
+            {loading && data.length > 0 ? (
+              <div className="pointer-events-none absolute inset-0 flex items-start justify-center bg-white/45 pt-16 backdrop-blur-[1px]">
+                <div className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 shadow-sm">
+                  Updating...
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
       </div>

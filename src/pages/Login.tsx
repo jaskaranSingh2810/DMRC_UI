@@ -61,30 +61,18 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(135deg,#0F172A_0%,#1D4ED8_28%,#F8FAFC_28%,#FFFFFF_100%)] p-4 sm:p-6">
-      <div className="mx-auto flex min-h-[calc(100vh-2rem)] max-w-[1500px] overflow-hidden rounded-[34px] border border-white/70 bg-white shadow-[0_40px_120px_rgba(15,23,42,0.24)]">
-        <div className="relative hidden flex-1 overflow-hidden lg:block">
+    <div className="min-h-screen">
+      <div className="mx-auto flex overflow-hidden border border-white/70 bg-white shadow-[0_40px_120px_rgba(15,23,42,0.24)]">
+        <div className="relative hidden overflow-hidden lg:block flex-[0.5]">
           <img
             src="/Login/Login-page-1.png"
             alt="Login Visual"
             className="h-full w-full object-cover"
           />
-          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(7,18,43,0.16)_0%,rgba(7,18,43,0.38)_100%)]" />
-          <div className="absolute inset-x-10 bottom-10 rounded-[28px] border border-white/20 bg-white/10 p-6 text-white backdrop-blur-md">
-            <img src="/Login/waisl.svg" alt="WAISL" className="h-9 w-fit" />
-            <p className="mt-6 max-w-lg text-3xl font-semibold leading-tight">
-              Secure control for airport media devices, notices, tickers, and ad
-              operations.
-            </p>
-            <p className="mt-3 max-w-xl text-sm leading-6 text-white/80">
-              Designed for real-time monitoring and operational teams that need a
-              fast, role-aware workflow.
-            </p>
-          </div>
         </div>
 
-        <div className="flex w-full items-center justify-center bg-white px-6 py-8 sm:px-8 lg:w-[42%] lg:px-12">
-          <form onSubmit={handleLogin} className="w-full max-w-md">
+        <div className="flex flex-[0.5] w-full items-center justify-center bg-white px-6 py-8 sm:px-8 lg:w-[42%] lg:px-12">
+          <form onSubmit={handleLogin} className="w-full max-w-lg">
             <div className="flex items-start justify-between gap-6">
               <img
                 src="/Login/Login-page-2.png"

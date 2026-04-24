@@ -29,6 +29,12 @@ interface DeviceState {
   totalElements: number;
   pageSize: number;
   selectedLocationId: string;
+  summary: {
+    totalDevices: number;
+    activeDevices: number;
+    inactiveDevices: number;
+    notWorkingDevices: number;
+  };
 }
 
 const initialState: DeviceState = {
@@ -45,9 +51,21 @@ const initialState: DeviceState = {
   totalElements: 0,
   pageSize: 10,
   selectedLocationId: "",
+  summary: {
+    totalDevices: 0,
+    activeDevices: 0,
+    inactiveDevices: 0,
+    notWorkingDevices: 0,
+  },
 };
 
 interface PaginatedDevices {
+  summary?: {
+    totalDevices: number;
+    activeDevices: number;
+    inactiveDevices: number;
+    notWorkingDevices: number;
+  };
   content: DeviceRecord[];
   currentPage: number;
   totalPages: number;
@@ -60,7 +78,15 @@ interface PaginatedDevices {
 interface DeviceListRequest {
   page: number;
   size: number;
-  locationId?: number;
+  locationIds?: number[];
+  deviceCode?: string;
+  brand?: string;
+  model?: string;
+  status?: string;
+  orientation?: string;
+  deviceSize?: number;
+  createdBy?: string;
+  createdAt?: string;
   sortCriteria?: DeviceSortCriteria[];
 }
 
@@ -110,9 +136,17 @@ export const fetchDevices = createAsyncThunk<
       await axiosInstance.post("/api/v1/dmrc/device/list", {
         page: payload?.page ?? 0,
         size: payload?.size ?? 10,
-        ...(payload?.locationId
-          ? { locationIds: [payload.locationId] }
+        ...(payload?.locationIds?.length ? { locationIds: payload.locationIds } : {}),
+        ...(payload?.deviceCode ? { deviceCode: payload.deviceCode } : {}),
+        ...(payload?.brand ? { brand: payload.brand } : {}),
+        ...(payload?.model ? { model: payload.model } : {}),
+        ...(payload?.status ? { status: payload.status } : {}),
+        ...(payload?.orientation ? { orientation: payload.orientation } : {}),
+        ...(typeof payload?.deviceSize === "number"
+          ? { deviceSize: payload.deviceSize }
           : {}),
+        ...(payload?.createdBy ? { createdBy: payload.createdBy } : {}),
+        ...(payload?.createdAt ? { createdAt: payload.createdAt } : {}),
         ...(payload?.sortCriteria?.length
           ? { sortCriteria: payload.sortCriteria }
           : {}),
@@ -311,6 +345,7 @@ const deviceSlice = createSlice({
     ) {
       state.filters[action.payload.key] = action.payload.value;
     },
+
     clearDeviceMessages(state) {
       state.error = null;
       state.successMessage = null;
@@ -344,6 +379,7 @@ const deviceSlice = createSlice({
       .addCase(fetchDevices.fulfilled, (state, action) => {
         state.loading = false;
         state.items = action.payload?.content ?? [];
+        state.summary = action.payload?.summary ?? initialState.summary;
         state.currentPage = (action.payload?.currentPage ?? 0) + 1;
         state.totalPages = action.payload?.totalPages ?? 1;
         state.totalElements = action.payload?.totalElements ?? 0;

@@ -122,6 +122,24 @@ function normalizeDeviceStatus(status: string): string {
   return normalizedStatus;
 }
 
+function getApiDeviceStatus(status: string): string {
+  const normalizedStatus = normalizeDeviceStatus(status);
+
+  if (normalizedStatus === "active") {
+    return "Active";
+  }
+
+  if (normalizedStatus === "inactive") {
+    return "Inactive";
+  }
+
+  if (normalizedStatus === "not_working") {
+    return "Not Working";
+  }
+
+  return status;
+}
+
 export default function DeviceManagement() {
   const dispatch = useAppDispatch();
   const toast = useToast();
@@ -131,8 +149,11 @@ export default function DeviceManagement() {
     error,
     successMessage,
     filters,
-    listLoaded,
+    currentPage,
+    totalPages,
+    pageSize,
     selectedLocationId,
+    summary,
   } = useAppSelector((state) => state.devices);
   const { items: locationList, listLoaded: locationListLoaded } =
     useAppSelector((state) => state.locations);
@@ -146,43 +167,10 @@ export default function DeviceManagement() {
     useState<DeviceStatFilter>("all");
 
   useEffect(() => {
-    if (!listLoaded) {
-      void dispatch(fetchDevices());
-    }
-  }, [dispatch, listLoaded]);
-
-  useEffect(() => {
     if (!locationListLoaded) {
       void dispatch(fetchLocations());
     }
   }, [dispatch, locationListLoaded]);
-
-  useEffect(() => {
-    if (!listLoaded) {
-      return;
-    }
-
-    void dispatch(
-      fetchDevices({
-        page: 0,
-        size: 10,
-        ...(selectedLocationId
-          ? { locationId: Number(selectedLocationId) }
-          : {}),
-        ...(sortState
-          ? {
-              sortCriteria: [
-                {
-                  field: sortState.key,
-                  direction: sortState.direction,
-                },
-              ],
-            }
-          : {}),
-      }),
-    );
-    setPage(1);
-  }, [dispatch, listLoaded, selectedLocationId, sortState]);
 
   useEffect(() => {
     if (successMessage) {
@@ -198,67 +186,65 @@ export default function DeviceManagement() {
     }
   }, [dispatch, error, toast]);
 
-  const filteredDevices = useMemo(() => {
-    const devicesMatchingTableFilters = items.filter((device) =>
-      Object.entries(filters).every(([key, value]) => {
-        if (!value) {
-          return true;
-        }
+  const buildDeviceListRequest = useMemo(
+    () => (pageNumber: number) => {
+      const normalizedCreatedAt = filters.createdAt?.trim();
+      const normalizedStatusFilter = filters.status?.trim();
+      const normalizedSizeFilter = filters.deviceSize?.trim();
 
-        const normalizedFilter = value.toLowerCase().trim();
-        const rawValue =
-          key === "locations"
-            ? (device.locationName ?? device.locations?.locationName)
-            : String(device[key as keyof DeviceRecord] ?? "");
-
-        return String(rawValue).toLowerCase().includes(normalizedFilter);
-      }),
-    );
-
-    if (selectedStatFilter === "all") {
-      return devicesMatchingTableFilters;
-    }
-
-    return devicesMatchingTableFilters.filter(
-      (device) => normalizeDeviceStatus(device.status) === selectedStatFilter,
-    );
-  }, [filters, items, selectedStatFilter]);
-
-  const activeDeviceCount = useMemo(
-    () =>
-      items.filter((item) => normalizeDeviceStatus(item.status) === "active")
-        .length,
-    [items],
-  );
-  const inactiveDeviceCount = useMemo(
-    () =>
-      items.filter((item) => normalizeDeviceStatus(item.status) === "inactive")
-        .length,
-    [items],
-  );
-  const notWorkingDeviceCount = useMemo(
-    () =>
-      items.filter(
-        (item) => normalizeDeviceStatus(item.status) === "not_working",
-      ).length,
-    [items],
-  );
-
-  const pageSize = 8;
-  const totalPages = Math.max(1, Math.ceil(filteredDevices.length / pageSize));
-  const paginatedDevices = filteredDevices.slice(
-    (page - 1) * pageSize,
-    page * pageSize,
+      return {
+        page: pageNumber - 1,
+        size: pageSize || 10,
+        ...(selectedLocationId
+          ? { locationIds: [Number(selectedLocationId)] }
+          : {}),
+        ...(filters.deviceCode?.trim()
+          ? { deviceCode: filters.deviceCode.trim() }
+          : {}),
+        ...(filters.brand?.trim() ? { brand: filters.brand.trim() } : {}),
+        ...(filters.model?.trim() ? { model: filters.model.trim() } : {}),
+        ...(selectedStatFilter !== "all"
+          ? {
+              status: getApiDeviceStatus(selectedStatFilter),
+            }
+          : normalizedStatusFilter
+            ? { status: getApiDeviceStatus(normalizedStatusFilter) }
+            : {}),
+        ...(filters.orientation?.trim()
+          ? { orientation: filters.orientation.trim() }
+          : {}),
+        ...(normalizedSizeFilter && !Number.isNaN(Number(normalizedSizeFilter))
+          ? { deviceSize: Number(normalizedSizeFilter) }
+          : {}),
+        ...(filters.createdBy?.trim()
+          ? { createdBy: filters.createdBy.trim() }
+          : {}),
+        ...(normalizedCreatedAt ? { createdAt: normalizedCreatedAt } : {}),
+        ...(sortState
+          ? {
+              sortCriteria: [
+                {
+                  field:
+                    sortState.key === "locations"
+                      ? "locationId"
+                      : sortState.key,
+                  direction: sortState.direction,
+                },
+              ],
+            }
+          : {}),
+      };
+    },
+    [filters, pageSize, selectedLocationId, selectedStatFilter, sortState],
   );
 
   useEffect(() => {
-    if (page > totalPages) {
-      setPage(totalPages);
-    }
-  }, [page, totalPages]);
+    void dispatch(fetchDevices(buildDeviceListRequest(page)));
+  }, [buildDeviceListRequest, dispatch, page]);
 
   useEffect(() => {
     setSelectedStatFilter("all");
+    setPage(1);
   }, [selectedLocationId]);
 
   useEffect(() => {
@@ -370,7 +356,7 @@ export default function DeviceManagement() {
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Total Devices"
-          value={String(items.length)}
+          value={String(summary.totalDevices)}
           accent="violet"
           icon={<Monitor size={22} />}
           isActive={selectedStatFilter === "all"}
@@ -378,7 +364,7 @@ export default function DeviceManagement() {
         />
         <StatCard
           label="Active Devices"
-          value={String(activeDeviceCount)}
+          value={String(summary.activeDevices)}
           accent="green"
           icon={<CheckCircle2 size={22} />}
           isActive={selectedStatFilter === "active"}
@@ -386,7 +372,7 @@ export default function DeviceManagement() {
         />
         <StatCard
           label="Inactive Devices"
-          value={String(inactiveDeviceCount)}
+          value={String(summary.inactiveDevices)}
           accent="slate"
           icon={<AlertTriangle size={22} />}
           isActive={selectedStatFilter === "inactive"}
@@ -394,7 +380,7 @@ export default function DeviceManagement() {
         />
         <StatCard
           label="Not working Devices"
-          value={String(notWorkingDeviceCount)}
+          value={String(summary.notWorkingDevices)}
           accent="red"
           icon={<XCircle size={22} />}
           isActive={selectedStatFilter === "not_working"}
@@ -404,10 +390,10 @@ export default function DeviceManagement() {
 
       <div className="shadow-sm">
         <DataTable
-          data={paginatedDevices}
+          data={items}
           columns={columns}
           loading={loading}
-          page={page}
+          page={currentPage || page}
           totalPages={totalPages}
           sortState={sortState}
           onPageChange={setPage}
@@ -447,25 +433,7 @@ export default function DeviceManagement() {
             );
 
             if (updateDevice.fulfilled.match(result)) {
-              await dispatch(
-                fetchDevices({
-                  page: 0,
-                  size: 10,
-                  ...(selectedLocationId
-                    ? { locationId: Number(selectedLocationId) }
-                    : {}),
-                  ...(sortState
-                    ? {
-                        sortCriteria: [
-                          {
-                            field: sortState.key,
-                            direction: sortState.direction,
-                          },
-                        ],
-                      }
-                    : {}),
-                }),
-              );
+              await dispatch(fetchDevices(buildDeviceListRequest(page)));
               setEditingDevice(null);
             }
           }}
@@ -508,25 +476,7 @@ export default function DeviceManagement() {
             );
 
             if (updateDeviceStatus.fulfilled.match(result)) {
-              await dispatch(
-                fetchDevices({
-                  page: 0,
-                  size: 10,
-                  ...(selectedLocationId
-                    ? { locationId: Number(selectedLocationId) }
-                    : {}),
-                  ...(sortState
-                    ? {
-                        sortCriteria: [
-                          {
-                            field: sortState.key,
-                            direction: sortState.direction,
-                          },
-                        ],
-                      }
-                    : {}),
-                }),
-              );
+              await dispatch(fetchDevices(buildDeviceListRequest(page)));
               setDeviceAction(null);
             }
           }}
@@ -552,25 +502,7 @@ export default function DeviceManagement() {
             );
 
             if (removeDevice.fulfilled.match(result)) {
-              await dispatch(
-                fetchDevices({
-                  page: 0,
-                  size: 10,
-                  ...(selectedLocationId
-                    ? { locationId: Number(selectedLocationId) }
-                    : {}),
-                  ...(sortState
-                    ? {
-                        sortCriteria: [
-                          {
-                            field: sortState.key,
-                            direction: sortState.direction,
-                          },
-                        ],
-                      }
-                    : {}),
-                }),
-              );
+              await dispatch(fetchDevices(buildDeviceListRequest(page)));
               setDeviceAction(null);
               setRemoveRemarks("");
             }
