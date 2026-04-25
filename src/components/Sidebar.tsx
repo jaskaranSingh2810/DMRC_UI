@@ -26,25 +26,41 @@ interface MenuItem {
 
 const menuConfig: Record<string, MenuItem[]> = {
   [UserRole.SUPER_ADMIN]: [
-    { label: "Dashboard", path: ["/dashboard"], icon: './Images/Sidebar/Dashboard.png' },
+    {
+      label: "Dashboard",
+      path: ["/dashboard"],
+      icon: "/Images/Sidebar/Dashboard.png",
+    },
     {
       label: "Ad Management",
       path: ["/ads-management", "/ads-management/create"],
-      icon: './Images/Sidebar/Ad_Management.png',
+      icon: "/Images/Sidebar/Ad_Management.png",
     },
     {
       label: "Notice Management",
       path: ["/notice-management", "/notice-management/create"],
-      icon: './Images/Sidebar/Notice_Management.png',
+      icon: "/Images/Sidebar/Notice_Management.png",
     },
     {
       label: "Ticker Management",
       path: ["/ticker-management", "/ticker-management/create"],
-      icon: './Images/Sidebar/Ticker_Management.png',
+      icon: "/Images/Sidebar/Ticker_Management.png",
     },
-    { label: "Device Management", path: ["/device-management"], icon: './Images/Sidebar/Device_Management.png' },
-    { label: "User Management", path: ["/user-management"], icon: './Images/Sidebar/User_Management.png' },
-    { label: "Support", path: ["/support"], icon: './Images/Sidebar/Support.png' },
+    {
+      label: "Device Management",
+      path: ["/device-management"],
+      icon: "/Images/Sidebar/Device_Management.png",
+    },
+    {
+      label: "User Management",
+      path: ["/user-management"],
+      icon: "/Images/Sidebar/User_Management.png",
+    },
+    {
+      label: "Support",
+      path: ["/support"],
+      icon: "/Images/Sidebar/Support.png",
+    },
   ],
 };
 
@@ -97,9 +113,9 @@ export default function Sidebar({
             <div className="flex items-center justify-between border-b border-blue-800 p-4 pl-[25px]">
               {!collapsed && (
                 <img
-                  src="./Images/Sidebar/Sidebar_Logo.png"
+                  src="/Images/Sidebar/Sidebar_Logo.png"
                   alt="Logo"
-                  className="lg:h-6 md:h-6 h-9"
+                  className="lg:h-6 md:h-6 h-5"
                 />
               )}
 
@@ -121,7 +137,7 @@ export default function Sidebar({
               </div>
             </div>
 
-            <nav className="mt-4 space-y-4 px-2">
+            <nav className="mt-4 lg:space-y-4 space-y-2 px-2">
               {menus.map((menu) => (
                 <MenuItemComponent
                   key={menu.path[0]}
@@ -135,7 +151,7 @@ export default function Sidebar({
 
           <div className="flex items-center gap-3 p-4">
             <img
-              src="./Images/Sidebar/Sidebar_User.png"
+              src="/Images/Sidebar/Sidebar_User.png"
               alt="User"
               className="h-12 w-12 rounded-full"
             />

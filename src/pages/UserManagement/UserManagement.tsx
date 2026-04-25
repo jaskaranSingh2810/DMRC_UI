@@ -415,7 +415,7 @@ export default function UserManagement() {
           label="Total Users"
           value={String(totalUsersCount)}
           accent="violet"
-          icon={'./Images/UserManagement/Total_Users.png'}
+          icon={'/Images/UserManagement/Total_Users.png'}
           isActive={selectedStatFilter === "all"}
           onClick={() => handleStatCardClick("all")}
         />
@@ -423,7 +423,7 @@ export default function UserManagement() {
           label="Active Users"
           value={String(activeUsersCount)}
           accent="green"
-          icon={'./Images/UserManagement/Active_Users.png'}
+          icon={'/Images/UserManagement/Active_Users.png'}
           isActive={selectedStatFilter === "active"}
           onClick={() => handleStatCardClick("active")}
         />
@@ -431,7 +431,7 @@ export default function UserManagement() {
           label="Inactive Users"
           value={String(inactiveUsersCount)}
           accent="slate"
-          icon={'./Images/UserManagement/Inactive_Users.png'}
+          icon={'/Images/UserManagement/Inactive_Users.png'}
           isActive={selectedStatFilter === "inactive"}
           onClick={() => handleStatCardClick("inactive")}
         />

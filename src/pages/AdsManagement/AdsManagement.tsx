@@ -341,7 +341,7 @@ export default function AdsManagement() {
           label="Total Ads"
           value={String(totalAdsCount)}
           accent="violet"
-          icon={'./Images/AdManagement/Total_Ads.png'}
+          icon={'/Images/AdManagement/Total_Ads.png'}
           isActive={selectedStatFilter === "all"}
           onClick={() => handleStatCardClick("all")}
         />
@@ -349,7 +349,7 @@ export default function AdsManagement() {
           label="Live Ads"
           value={String(liveAdsCount)}
           accent="green"
-          icon={'./Images/AdManagement/Live_Ads.png'}
+          icon={'/Images/AdManagement/Live_Ads.png'}
           isActive={selectedStatFilter === "live"}
           onClick={() => handleStatCardClick("live")}
         />
@@ -357,7 +357,7 @@ export default function AdsManagement() {
           label="Expired Ads"
           value={String(expiredAdsCount)}
           accent="red"
-          icon={'./Images/AdManagement/Expired_Ads.png'}
+          icon={'/Images/AdManagement/Expired_Ads.png'}
           isActive={selectedStatFilter === "expired"}
           onClick={() => handleStatCardClick("expired")}
         />

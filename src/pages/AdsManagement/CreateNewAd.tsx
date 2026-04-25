@@ -1,11 +1,14 @@
-import React from 'react'
+import { useLocation } from "react-router-dom";
+import type { Ad } from "@/types";
+import AdCampaignWizard from "./AdCampaignWizard";
 
-type Props = {}
-
-const CreateNewAd = (props: Props) => {
-  return (
-    <div>CreateNewAd</div>
-  )
+interface LocationState {
+  ad?: Ad;
 }
 
-export default CreateNewAd
+export default function CreateNewAd() {
+  const location = useLocation();
+  const locationState = location.state as LocationState | null;
+
+  return <AdCampaignWizard initialAd={locationState?.ad ?? null} />;
+}

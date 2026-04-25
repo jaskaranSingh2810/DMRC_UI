@@ -67,7 +67,7 @@ export default function Login() {
       <div className="mx-auto flex overflow-hidden border border-white/70 bg-white shadow-[0_40px_120px_rgba(15,23,42,0.24)]">
         <div className="relative hidden overflow-hidden lg:block flex-[0.5]">
           <img
-            src="./Images/Login/Login_Left.png"
+            src="/Images/Login/Login_Left.png"
             alt="Login Visual"
             className="h-full w-full object-cover"
           />
@@ -76,7 +76,7 @@ export default function Login() {
         <div className="flex flex-[0.5] w-full items-center justify-center bg-white px-6 py-8 sm:px-8 lg:w-[42%] lg:px-12">
           <div className="absolute top-[30px] right-[30px] overflow-hidden">
             <img
-              src="./Images/Login/Delhi_Metro.png"
+              src="/Images/Login/Delhi_Metro.png"
               alt="Login Visual"
               className="h-8 w-auto object-cover"
             />
@@ -84,7 +84,7 @@ export default function Login() {
           <form onSubmit={handleLogin} className="w-full max-w-lg">
             <div className="flex items-start justify-between gap-6">
               <img
-                src="./Images/Login/Login_Top.png"
+                src="/Images/Login/Login_Top.png"
                 alt="DMRC Logo"
                 className="h-14 w-auto sm:h-16"
               />

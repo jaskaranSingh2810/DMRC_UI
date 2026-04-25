@@ -360,7 +360,7 @@ export default function DeviceManagement() {
           label="Total Devices"
           value={String(summary.totalDevices)}
           accent="violet"
-          icon={'./Images/DeviceManagement/Total_Devices.png'}
+          icon={'/Images/DeviceManagement/Total_Devices.png'}
           isActive={selectedStatFilter === "all"}
           onClick={() => handleStatCardClick("all")}
         />
@@ -368,7 +368,7 @@ export default function DeviceManagement() {
           label="Active Devices"
           value={String(summary.activeDevices)}
           accent="green"
-          icon={'./Images/DeviceManagement/Active_Devices.png'}
+          icon={'/Images/DeviceManagement/Active_Devices.png'}
           isActive={selectedStatFilter === "active"}
           onClick={() => handleStatCardClick("active")}
         />
@@ -376,7 +376,7 @@ export default function DeviceManagement() {
           label="Inactive Devices"
           value={String(summary.inactiveDevices)}
           accent="slate"
-          icon={'./Images/DeviceManagement/Inactive_Devices.png'}
+          icon={'/Images/DeviceManagement/Inactive_Devices.png'}
           isActive={selectedStatFilter === "inactive"}
           onClick={() => handleStatCardClick("inactive")}
         />
@@ -384,7 +384,7 @@ export default function DeviceManagement() {
           label="Not working Devices"
           value={String(summary.notWorkingDevices)}
           accent="red"
-          icon={'./Images/DeviceManagement/Not_Working_Devices.png'}
+          icon={'/Images/DeviceManagement/Not_Working_Devices.png'}
           isActive={selectedStatFilter === "not_working"}
           onClick={() => handleStatCardClick("not_working")}
         />
