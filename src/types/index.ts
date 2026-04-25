@@ -27,32 +27,55 @@ export enum DeviceType {
 }
 
 export interface Permission {
+  id?: string | number;
   name: string;
 }
 
 export interface UserModule {
+  id?: string | number;
+  name?: string;
   moduleId?: string | number;
   moduleName?: string;
   permissions: Permission[];
 }
 
+export interface UserDepartment {
+  id?: string | number;
+  name?: string;
+}
+
 export interface UserProfile {
   id?: string | number;
   username?: string;
+  fullName?: string | null;
   email?: string;
+  emailId?: string | null;
+  department?: UserDepartment | null;
   role?: {
+    id?: string | number;
     name?: UserRole | string;
   };
   modules?: UserModule[];
   [key: string]: unknown;
 }
 
+export interface SidebarMenuItem {
+  id: string | number;
+  name: string;
+  path: string;
+  icon: string;
+  permission?: string | null;
+}
+
 export interface User {
   accessToken: string | null;
+  refreshToken: string | null;
+  accessTokenExpiresAt?: number | null;
   role: UserRole | string | null;
   profile: UserProfile | null;
   modules: UserModule[];
   permissions: string[];
+  menu: SidebarMenuItem[];
 }
 
 export interface DeviceLocation {

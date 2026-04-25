@@ -2,19 +2,39 @@ import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
 import type { AxiosResponse } from "axios";
 import axiosInstance from "@/api/axiosInstance";
-import type { ApiEnvelope, AsyncStatus, User, UserProfile } from "@/types";
-import { setAuthUser, getAuthUser, clearAuthStorage } from "@/utils/auth";
+import type {
+  ApiEnvelope,
+  AsyncStatus,
+  SidebarMenuItem,
+  User,
+  UserProfile,
+} from "@/types";
+import {
+  clearAuthStorage,
+  getAuthUser,
+  isRememberedAuth,
+  setAuthUser,
+} from "@/utils/auth";
 import { normalizeUser } from "@/utils/normalizeUser";
 import { getApiData, getApiMessage, isApiSuccess } from "@/utils/api";
 import { parseApiError } from "@/utils/errorHandler";
 
 interface LoginPayload {
+  accessToken: string;
+  accessTokenExpiresAt?: number;
+  refreshToken?: string;
+  message?: string;
+  success?: boolean;
+  time?: string;
+  status?: string;
+}
+
+interface RefreshResponse {
+  status?: string;
   accessToken?: string;
-  token?: string;
-  roles?: string[];
-  user?: {
-    roles?: string[];
-  };
+  refreshToken?: string;
+  message?: string;
+  success?: boolean;
 }
 
 interface LoginRequest {
@@ -50,6 +70,29 @@ const initialState: AuthState = {
   status: "idle",
 };
 
+async function requestUserProfile(): Promise<UserProfile> {
+  const response: AxiosResponse<ApiEnvelope<UserProfile>> = await axiosInstance.get(
+    "/api/v1/dmrc/auth/user-profile",
+  );
+
+  if (!isApiSuccess(response.data)) {
+    throw new Error(getApiMessage(response.data, "Failed to load profile."));
+  }
+
+  return getApiData(response.data);
+}
+
+async function requestMenu(): Promise<SidebarMenuItem[]> {
+  const response: AxiosResponse<ApiEnvelope<SidebarMenuItem[]>> =
+    await axiosInstance.get("/api/v1/dmrc/auth/menu");
+
+  if (!isApiSuccess(response.data)) {
+    throw new Error(getApiMessage(response.data, "Failed to load menu."));
+  }
+
+  return getApiData(response.data);
+}
+
 export const loginUser = createAsyncThunk<
   User,
   LoginRequest,
@@ -69,20 +112,15 @@ export const loginUser = createAsyncThunk<
     const loginData = getApiData(loginResponse.data);
     const baseUser = normalizeUser(loginData);
 
-    const profileResponse: AxiosResponse<ApiEnvelope<UserProfile>> =
-      await axiosInstance.get("/api/v1/dmrc/auth/user-profile", {
-        headers: {
-          Authorization: `Bearer ${baseUser.accessToken}`,
-        },
-      });
+    setAuthUser(baseUser, remember);
 
-    const fullUser = isApiSuccess(profileResponse.data)
-      ? normalizeUser(loginData, getApiData(profileResponse.data))
-      : baseUser;
+    const [profile, menu] = await Promise.all([requestUserProfile(), requestMenu()]);
+    const fullUser = normalizeUser(loginData, profile, menu);
 
     setAuthUser(fullUser, remember);
     return fullUser;
   } catch (error) {
+    clearAuthStorage();
     return rejectWithValue(parseApiError(error, "Unable to login."));
   }
 });
@@ -99,20 +137,108 @@ export const fetchProfile = createAsyncThunk<
       throw new Error("No active session found.");
     }
 
-    const response: AxiosResponse<ApiEnvelope<UserProfile>> =
-      await axiosInstance.get("/api/v1/dmrc/auth/user-profile");
+    const profile = await requestUserProfile();
+    const updatedUser = normalizeUser(
+      existingUser,
+      profile,
+      existingUser.menu ?? [],
+    );
 
-    if (!isApiSuccess(response.data)) {
-      return rejectWithValue(
-        getApiMessage(response.data, "Failed to load profile.")
-      );
-    }
-
-    const updatedUser = normalizeUser(existingUser, getApiData(response.data));
-    setAuthUser(updatedUser, Boolean(localStorage.getItem("authUser")));
+    setAuthUser(updatedUser, isRememberedAuth());
     return updatedUser;
   } catch (error) {
     return rejectWithValue(parseApiError(error, "Failed to load profile."));
+  }
+});
+
+export const fetchMenu = createAsyncThunk<
+  User,
+  void,
+  { state: { auth: AuthState }; rejectValue: string }
+>("auth/fetchMenu", async (_, { getState, rejectWithValue }) => {
+  try {
+    const existingUser = getState().auth.user ?? getAuthUser();
+
+    if (!existingUser?.accessToken) {
+      throw new Error("No active session found.");
+    }
+
+    const menu = await requestMenu();
+    const updatedUser: User = {
+      ...existingUser,
+      menu,
+    };
+
+    setAuthUser(updatedUser, isRememberedAuth());
+    return updatedUser;
+  } catch (error) {
+    return rejectWithValue(parseApiError(error, "Failed to load menu."));
+  }
+});
+
+export const refreshAuthToken = createAsyncThunk<
+  User,
+  void,
+  { state: { auth: AuthState }; rejectValue: string }
+>("auth/refresh", async (_, { getState, rejectWithValue }) => {
+  try {
+    const existingUser = getState().auth.user ?? getAuthUser();
+
+    if (!existingUser?.accessToken) {
+      throw new Error("No active session found.");
+    }
+
+    const response: AxiosResponse<RefreshResponse> = await axiosInstance.post(
+      "/api/v1/dmrc/auth/refresh",
+      undefined,
+      {
+        headers: {
+          Authorization: `Bearer ${existingUser.accessToken}`,
+        },
+      },
+    );
+
+    if (!response.data?.success || !response.data.accessToken) {
+      return rejectWithValue(
+        response.data?.message ?? "Unable to refresh session.",
+      );
+    }
+
+    const updatedUser: User = {
+      ...existingUser,
+      accessToken: response.data.accessToken ?? existingUser.accessToken,
+      refreshToken: response.data.refreshToken ?? existingUser.refreshToken,
+    };
+
+    setAuthUser(updatedUser, isRememberedAuth());
+    return updatedUser;
+  } catch (error) {
+    return rejectWithValue(parseApiError(error, "Unable to refresh session."));
+  }
+});
+
+export const logoutUser = createAsyncThunk<
+  string,
+  void,
+  { state: { auth: AuthState }; rejectValue: string }
+>("auth/logoutUser", async (_, { getState, rejectWithValue }) => {
+  try {
+    const existingUser = getState().auth.user ?? getAuthUser();
+
+    if (existingUser?.accessToken) {
+      const response: AxiosResponse<{ message?: string; status?: string }> =
+        await axiosInstance.post("/api/v1/dmrc/auth/logout", undefined, {
+          headers: {
+            Authorization: `Bearer ${existingUser.accessToken}`,
+          },
+        });
+
+      return response.data.message ?? "Logged out successfully.";
+    }
+
+    return "Logged out successfully.";
+  } catch (error) {
+    return rejectWithValue(parseApiError(error, "Unable to logout."));
   }
 });
 
@@ -124,20 +250,18 @@ export const forgotPassword = createAsyncThunk<
   try {
     const response: AxiosResponse<ApiEnvelope<unknown>> = await axiosInstance.post(
       "/api/v1/dmrc/auth/forgot-password",
-      { email }
+      { email },
     );
 
     if (!isApiSuccess(response.data)) {
       return rejectWithValue(
-        getApiMessage(response.data, "Unable to send reset link.")
+        getApiMessage(response.data, "Unable to send reset link."),
       );
     }
 
     return getApiMessage(response.data, "Reset link sent successfully.");
   } catch (error) {
-    return rejectWithValue(
-      parseApiError(error, "Unable to send reset link.")
-    );
+    return rejectWithValue(parseApiError(error, "Unable to send reset link."));
   }
 });
 
@@ -152,20 +276,18 @@ export const resetPassword = createAsyncThunk<
       {
         token,
         password,
-      }
+      },
     );
 
     if (!isApiSuccess(response.data)) {
       return rejectWithValue(
-        getApiMessage(response.data, "Unable to reset password.")
+        getApiMessage(response.data, "Unable to reset password."),
       );
     }
 
     return getApiMessage(response.data, "Password updated successfully.");
   } catch (error) {
-    return rejectWithValue(
-      parseApiError(error, "Unable to reset password.")
-    );
+    return rejectWithValue(parseApiError(error, "Unable to reset password."));
   }
 });
 
@@ -173,7 +295,7 @@ const authSlice = createSlice({
   name: "auth",
   initialState,
   reducers: {
-    logout(state) {
+    logoutLocal(state) {
       state.user = null;
       state.loading = false;
       state.error = null;
@@ -188,6 +310,11 @@ const authSlice = createSlice({
     setAuthenticatedUser(state, action: PayloadAction<User>) {
       state.user = action.payload;
     },
+    setAuthMenu(state, action: PayloadAction<SidebarMenuItem[]>) {
+      if (state.user) {
+        state.user.menu = action.payload;
+      }
+    },
   },
   extraReducers: (builder) => {
     const pending = (state: AuthState) => {
@@ -199,7 +326,7 @@ const authSlice = createSlice({
 
     const rejected = (
       state: AuthState,
-      action: PayloadAction<string | undefined>
+      action: PayloadAction<string | undefined>,
     ) => {
       state.loading = false;
       state.error = action.payload ?? "Request failed.";
@@ -221,6 +348,37 @@ const authSlice = createSlice({
         state.status = "succeeded";
       })
       .addCase(fetchProfile.rejected, rejected)
+      .addCase(fetchMenu.pending, pending)
+      .addCase(fetchMenu.fulfilled, (state, action) => {
+        state.loading = false;
+        state.user = action.payload;
+        state.status = "succeeded";
+      })
+      .addCase(fetchMenu.rejected, rejected)
+      .addCase(refreshAuthToken.pending, pending)
+      .addCase(refreshAuthToken.fulfilled, (state, action) => {
+        state.loading = false;
+        state.user = action.payload;
+        state.status = "succeeded";
+      })
+      .addCase(refreshAuthToken.rejected, rejected)
+      .addCase(logoutUser.pending, pending)
+      .addCase(logoutUser.fulfilled, (state, action) => {
+        state.user = null;
+        state.loading = false;
+        state.error = null;
+        state.successMessage = action.payload;
+        state.status = "idle";
+        clearAuthStorage();
+      })
+      .addCase(logoutUser.rejected, (state, action) => {
+        state.user = null;
+        state.loading = false;
+        state.error = action.payload ?? null;
+        state.successMessage = null;
+        state.status = "idle";
+        clearAuthStorage();
+      })
       .addCase(forgotPassword.pending, pending)
       .addCase(forgotPassword.fulfilled, (state, action) => {
         state.loading = false;
@@ -238,6 +396,10 @@ const authSlice = createSlice({
   },
 });
 
-export const { logout, clearAuthMessages, setAuthenticatedUser } =
-  authSlice.actions;
+export const {
+  logoutLocal,
+  clearAuthMessages,
+  setAuthenticatedUser,
+  setAuthMenu,
+} = authSlice.actions;
 export default authSlice.reducer;

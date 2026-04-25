@@ -1,16 +1,16 @@
 import { LogOut } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAppDispatch } from "@/store/hooks";
-import { logout } from "@/store/slices/authSlice";
+import { logoutUser } from "@/store/slices/authSlice";
 
 export default function LogoutButton() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
 
-  const handleLogout = (): void => {
+  const handleLogout = async (): Promise<void> => {
     const shouldLogout = window.confirm("Are you sure you want to logout?");
     if (shouldLogout) {
-      dispatch(logout());
+      await dispatch(logoutUser());
       navigate("/login", { replace: true });
     }
   };

@@ -1,68 +1,45 @@
-import {
-  BoomBox,
-  FileText,
-  Headphones,
-  LayoutDashboard,
-  Megaphone,
-  Monitor,
-  ScrollText,
-  Users,
-  X,
-  PanelRightOpen,
-  PanelRightClose,
-} from "lucide-react";
-import type { LucideIcon } from "lucide-react";
-import { useEffect, useState } from "react";
-import { NavLink } from "react-router-dom";
-import { UserRole } from "@/types";
-import { useLocation } from "react-router-dom";
+import { PanelRightClose, PanelRightOpen, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { NavLink, useLocation } from "react-router-dom";
 import { useAppSelector } from "@/store/hooks";
+import type { SidebarMenuItem } from "@/types";
 
 interface MenuItem {
   label: string;
-  path: string[];
+  paths: string[];
   icon: string;
 }
 
-const menuConfig: Record<string, MenuItem[]> = {
-  [UserRole.SUPER_ADMIN]: [
-    {
-      label: "Dashboard",
-      path: ["/dashboard"],
-      icon: "/Images/Sidebar/Dashboard.png",
-    },
-    {
-      label: "Ad Management",
-      path: ["/ads-management", "/ads-management/create"],
-      icon: "/Images/Sidebar/Ad_Management.png",
-    },
-    {
-      label: "Notice Management",
-      path: ["/notice-management", "/notice-management/create"],
-      icon: "/Images/Sidebar/Notice_Management.png",
-    },
-    {
-      label: "Ticker Management",
-      path: ["/ticker-management", "/ticker-management/create"],
-      icon: "/Images/Sidebar/Ticker_Management.png",
-    },
-    {
-      label: "Device Management",
-      path: ["/device-management"],
-      icon: "/Images/Sidebar/Device_Management.png",
-    },
-    {
-      label: "User Management",
-      path: ["/user-management"],
-      icon: "/Images/Sidebar/User_Management.png",
-    },
-    {
-      label: "Support",
-      path: ["/support"],
-      icon: "/Images/Sidebar/Support.png",
-    },
-  ],
-};
+function buildRelatedPaths(path: string): string[] {
+  const trimmedPath = path.trim();
+
+  if (!trimmedPath) {
+    return [];
+  }
+
+  const normalizedPath = trimmedPath.startsWith("/")
+    ? trimmedPath
+    : `/${trimmedPath}`;
+
+  const relatedPaths = [normalizedPath];
+
+  if (!normalizedPath.endsWith("/create")) {
+    relatedPaths.push(`${normalizedPath}/create`);
+  }
+
+  return relatedPaths;
+}
+
+function mapBackendMenu(menuItems: SidebarMenuItem[]): MenuItem[] {
+  return menuItems
+    .filter((item) => item.name?.trim() && item.path?.trim())
+    .map((item) => ({
+      label: item.name.trim(),
+      paths: buildRelatedPaths(item.path),
+      icon: item.icon?.trim() || "/Images/Sidebar/Support.png",
+    }))
+    .filter((item) => item.paths.length > 0);
+}
 
 export default function Sidebar({
   isOpen,
@@ -87,42 +64,39 @@ export default function Sidebar({
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  const menus = menuConfig[user?.role ?? UserRole.SUPER_ADMIN] ?? [];
+  const menus = useMemo(() => mapBackendMenu(user?.menu ?? []), [user?.menu]);
 
   return (
     <>
-      {isOpen && (
+      {isOpen ? (
         <div
           className="fixed inset-0 z-40 bg-black/40 md:hidden"
           onClick={() => setIsOpen(false)}
         />
-      )}
+      ) : null}
 
       <aside
-        className={`
-    fixed z-50 h-full bg-custom-gradient text-white transition-all duration-300
-    
-    ${isOpen ? "translate-x-0" : "-translate-x-full"}
-    md:translate-x-0 md:static
-    
-    w-64 ${collapsed ? "md:w-20" : "md:w-64"}
-  `}
+        className={`fixed z-50 h-full bg-custom-gradient text-white transition-all duration-300 ${
+          isOpen ? "translate-x-0" : "-translate-x-full"
+        } md:static md:translate-x-0 ${collapsed ? "w-64 md:w-20" : "w-64"}`}
       >
         <div className="flex h-full flex-col justify-between">
           <div>
             <div className="flex items-center justify-between border-b border-blue-800 p-4 pl-[25px]">
-              {!collapsed && (
+              {!collapsed ? (
                 <img
                   src="/Images/Sidebar/Sidebar_Logo.png"
                   alt="Logo"
-                  className="lg:h-6 md:h-6 h-5"
+                  className="h-5 md:h-6 lg:h-6"
                 />
-              )}
+              ) : null}
 
               <div className="flex items-center gap-2">
                 <button
+                  type="button"
                   className="hidden md:block"
-                  onClick={() => setCollapsed(!collapsed)}
+                  onClick={() => setCollapsed((value) => !value)}
+                  aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
                 >
                   {collapsed ? (
                     <PanelRightOpen size={18} />
@@ -131,19 +105,24 @@ export default function Sidebar({
                   )}
                 </button>
 
-                <button className="md:hidden" onClick={() => setIsOpen(false)}>
+                <button
+                  type="button"
+                  className="md:hidden"
+                  onClick={() => setIsOpen(false)}
+                  aria-label="Close sidebar"
+                >
                   <X size={20} />
                 </button>
               </div>
             </div>
 
-            <nav className="mt-4 lg:space-y-4 space-y-2 px-2">
+            <nav className="mt-4 space-y-2 px-2 lg:space-y-4">
               {menus.map((menu) => (
                 <MenuItemComponent
-                  key={menu.path[0]}
-                  {...menu}
+                  key={menu.paths[0]}
+                  menu={menu}
                   collapsed={collapsed}
-                  setIsOpen={setIsOpen}
+                  onNavigate={() => setIsOpen(false)}
                 />
               ))}
             </nav>
@@ -156,16 +135,16 @@ export default function Sidebar({
               className="h-12 w-12 rounded-full"
             />
 
-            {!collapsed && (
+            {!collapsed ? (
               <div className="min-w-0">
                 <div className="truncate text-[20px] font-semibold uppercase text-white">
-                  {user?.profile?.username ?? "RAMESH SINGH"}
+                  {user?.profile?.username ?? "USER"}
                 </div>
-                <div className="text-[16px] text-[#CBCBCB] truncate">
-                  {user?.role ?? "Admin Manager"}
+                <div className="truncate text-[16px] text-[#CBCBCB]">
+                  {user?.role ?? "User"}
                 </div>
               </div>
-            )}
+            ) : null}
           </div>
         </div>
       </aside>
@@ -174,38 +153,39 @@ export default function Sidebar({
 }
 
 function MenuItemComponent({
-  label,
-  path,
-  icon: Icon,
+  menu,
   collapsed,
-  setIsOpen,
-}: MenuItem & { collapsed: boolean; setIsOpen: (val: boolean) => void }) {
+  onNavigate,
+}: {
+  menu: MenuItem;
+  collapsed: boolean;
+  onNavigate: () => void;
+}) {
   const { pathname } = useLocation();
 
-  const isActive = path.some(
-    (p) => pathname === p || pathname.startsWith(p + "/"),
+  const isActive = menu.paths.some(
+    (path) => pathname === path || pathname.startsWith(`${path}/`),
   );
 
   return (
     <NavLink
-      to={path[0]}
-      onClick={() => setIsOpen(false)}
-      className={`group relative flex items-center gap-3 rounded-lg pl-4 py-2 transition-all
-        ${
-          isActive
-            ? "bg-[rgba(239,_246,_255,_0.2)] border-l-2 border-white"
-            : "hover:bg-[rgba(239,_246,_255,_0.2)]"
-        }`}
+      to={menu.paths[0]}
+      onClick={onNavigate}
+      className={`group relative flex items-center gap-3 rounded-lg py-2 pl-4 transition-all ${
+        isActive
+          ? "border-l-2 border-white bg-[rgba(239,_246,_255,_0.2)]"
+          : "hover:bg-[rgba(239,_246,_255,_0.2)]"
+      }`}
     >
-      <img src={Icon} alt={label} className="h-5 w-5" />
+      <img src={menu.icon} alt={menu.label} className="h-5 w-5" />
 
-      {!collapsed && <span className="text-sm">{label}</span>}
+      {!collapsed ? <span className="text-sm">{menu.label}</span> : null}
 
-      {collapsed && (
+      {collapsed ? (
         <span className="absolute left-14 z-50 hidden whitespace-nowrap rounded bg-black px-2 py-1 text-xs text-white group-hover:block">
-          {label}
+          {menu.label}
         </span>
-      )}
+      ) : null}
     </NavLink>
   );
 }
