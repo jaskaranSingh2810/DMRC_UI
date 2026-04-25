@@ -360,7 +360,7 @@ export default function DeviceManagement() {
           label="Total Devices"
           value={String(summary.totalDevices)}
           accent="violet"
-          icon={<Monitor size={22} />}
+          icon={'./Images/DeviceManagement/Total_Devices.png'}
           isActive={selectedStatFilter === "all"}
           onClick={() => handleStatCardClick("all")}
         />
@@ -368,7 +368,7 @@ export default function DeviceManagement() {
           label="Active Devices"
           value={String(summary.activeDevices)}
           accent="green"
-          icon={<CheckCircle2 size={22} />}
+          icon={'./Images/DeviceManagement/Active_Devices.png'}
           isActive={selectedStatFilter === "active"}
           onClick={() => handleStatCardClick("active")}
         />
@@ -376,7 +376,7 @@ export default function DeviceManagement() {
           label="Inactive Devices"
           value={String(summary.inactiveDevices)}
           accent="slate"
-          icon={<AlertTriangle size={22} />}
+          icon={'./Images/DeviceManagement/Inactive_Devices.png'}
           isActive={selectedStatFilter === "inactive"}
           onClick={() => handleStatCardClick("inactive")}
         />
@@ -384,7 +384,7 @@ export default function DeviceManagement() {
           label="Not working Devices"
           value={String(summary.notWorkingDevices)}
           accent="red"
-          icon={<XCircle size={22} />}
+          icon={'./Images/DeviceManagement/Not_Working_Devices.png'}
           isActive={selectedStatFilter === "not_working"}
           onClick={() => handleStatCardClick("not_working")}
         />
@@ -525,7 +525,7 @@ function StatCard({
 }: {
   label: string;
   value: string;
-  icon: ReactNode;
+  icon: string;
   accent: "violet" | "green" | "slate" | "red";
   isActive: boolean;
   onClick: () => void;
@@ -564,9 +564,9 @@ function StatCard({
         </p>
       </div>
       <div
-        className={`flex h-12 w-12 items-center justify-center rounded-xl ${accentStyles[accent].tile}`}
+        className={`flex h-12 w-12 items-center justify-center rounded-xl`}
       >
-        {icon}
+        <img src={icon} alt={label} className="h-12 w-12" />
       </div>
     </button>
   );

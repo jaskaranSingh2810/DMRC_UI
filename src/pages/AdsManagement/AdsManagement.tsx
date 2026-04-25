@@ -341,7 +341,7 @@ export default function AdsManagement() {
           label="Total Ads"
           value={String(totalAdsCount)}
           accent="violet"
-          icon={<ImageIcon size={22} />}
+          icon={'./Images/AdManagement/Total_Ads.png'}
           isActive={selectedStatFilter === "all"}
           onClick={() => handleStatCardClick("all")}
         />
@@ -349,7 +349,7 @@ export default function AdsManagement() {
           label="Live Ads"
           value={String(liveAdsCount)}
           accent="green"
-          icon={<Radio size={22} />}
+          icon={'./Images/AdManagement/Live_Ads.png'}
           isActive={selectedStatFilter === "live"}
           onClick={() => handleStatCardClick("live")}
         />
@@ -357,7 +357,7 @@ export default function AdsManagement() {
           label="Expired Ads"
           value={String(expiredAdsCount)}
           accent="red"
-          icon={<Clock3 size={22} />}
+          icon={'./Images/AdManagement/Expired_Ads.png'}
           isActive={selectedStatFilter === "expired"}
           onClick={() => handleStatCardClick("expired")}
         />
@@ -441,7 +441,7 @@ function StatCard({
 }: {
   label: string;
   value: string;
-  icon: ReactNode;
+  icon: string;
   accent: "violet" | "green" | "red";
   isActive: boolean;
   onClick: () => void;
@@ -478,7 +478,7 @@ function StatCard({
       <div
         className={`flex h-12 w-12 items-center justify-center rounded-xl ${accentStyles[accent].tile}`}
       >
-        {icon}
+        <img src={icon} alt={label} className="h-12 w-12" />
       </div>
     </button>
   );

@@ -49,14 +49,16 @@ export default function Login() {
     }));
   };
 
-  const handleLogin = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
+  const handleLogin = async (
+    event: FormEvent<HTMLFormElement>,
+  ): Promise<void> => {
     event.preventDefault();
     await dispatch(
       loginUser({
         username: form.username,
         password: form.password,
         remember: form.remember,
-      })
+      }),
     );
   };
 
@@ -65,17 +67,24 @@ export default function Login() {
       <div className="mx-auto flex overflow-hidden border border-white/70 bg-white shadow-[0_40px_120px_rgba(15,23,42,0.24)]">
         <div className="relative hidden overflow-hidden lg:block flex-[0.5]">
           <img
-            src="/Login/Login-page-1.png"
+            src="./Images/Login/Login_Left.png"
             alt="Login Visual"
             className="h-full w-full object-cover"
           />
         </div>
 
         <div className="flex flex-[0.5] w-full items-center justify-center bg-white px-6 py-8 sm:px-8 lg:w-[42%] lg:px-12">
+          <div className="absolute top-[30px] right-[30px] overflow-hidden">
+            <img
+              src="./Images/Login/Delhi_Metro.png"
+              alt="Login Visual"
+              className="h-8 w-auto object-cover"
+            />
+          </div>
           <form onSubmit={handleLogin} className="w-full max-w-lg">
             <div className="flex items-start justify-between gap-6">
               <img
-                src="/Login/Login-page-2.png"
+                src="./Images/Login/Login_Top.png"
                 alt="DMRC Logo"
                 className="h-14 w-auto sm:h-16"
               />
@@ -121,7 +130,7 @@ export default function Login() {
                 />
                 <button
                   type="button"
-                  className="absolute right-3 top-[42px] rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                  className="absolute right-3 top-[34px] rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
                   onClick={() => setShowPassword((previous) => !previous)}
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
@@ -162,4 +171,3 @@ export default function Login() {
     </div>
   );
 }
-

@@ -415,7 +415,7 @@ export default function UserManagement() {
           label="Total Users"
           value={String(totalUsersCount)}
           accent="violet"
-          icon={<Users size={22} />}
+          icon={'./Images/UserManagement/Total_Users.png'}
           isActive={selectedStatFilter === "all"}
           onClick={() => handleStatCardClick("all")}
         />
@@ -423,7 +423,7 @@ export default function UserManagement() {
           label="Active Users"
           value={String(activeUsersCount)}
           accent="green"
-          icon={<UserCheck size={22} />}
+          icon={'./Images/UserManagement/Active_Users.png'}
           isActive={selectedStatFilter === "active"}
           onClick={() => handleStatCardClick("active")}
         />
@@ -431,7 +431,7 @@ export default function UserManagement() {
           label="Inactive Users"
           value={String(inactiveUsersCount)}
           accent="slate"
-          icon={<UserCog size={22} />}
+          icon={'./Images/UserManagement/Inactive_Users.png'}
           isActive={selectedStatFilter === "inactive"}
           onClick={() => handleStatCardClick("inactive")}
         />
@@ -517,7 +517,7 @@ function StatCard({
 }: {
   label: string;
   value: string;
-  icon: ReactNode;
+  icon: string;
   accent: "violet" | "green" | "slate";
   isActive: boolean;
   onClick: () => void;
@@ -558,7 +558,7 @@ function StatCard({
       <div
         className={`flex h-12 w-12 items-center justify-center rounded-xl ${accentStyles[accent].tile}`}
       >
-        {icon}
+        <img src={icon} alt={label} className="h-12 w-12" />
       </div>
     </button>
   );

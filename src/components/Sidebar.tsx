@@ -21,30 +21,30 @@ import { useAppSelector } from "@/store/hooks";
 interface MenuItem {
   label: string;
   path: string[];
-  icon: LucideIcon;
+  icon: string;
 }
 
 const menuConfig: Record<string, MenuItem[]> = {
   [UserRole.SUPER_ADMIN]: [
-    { label: "Dashboard", path: ["/dashboard"], icon: LayoutDashboard },
+    { label: "Dashboard", path: ["/dashboard"], icon: './Images/Sidebar/Dashboard.png' },
     {
       label: "Ad Management",
       path: ["/ads-management", "/ads-management/create"],
-      icon: BoomBox,
+      icon: './Images/Sidebar/Ad_Management.png',
     },
     {
       label: "Notice Management",
       path: ["/notice-management", "/notice-management/create"],
-      icon: Megaphone,
+      icon: './Images/Sidebar/Notice_Management.png',
     },
     {
       label: "Ticker Management",
       path: ["/ticker-management", "/ticker-management/create"],
-      icon: ScrollText,
+      icon: './Images/Sidebar/Ticker_Management.png',
     },
-    { label: "Device Management", path: ["/device-management"], icon: Monitor },
-    { label: "User Management", path: ["/user-management"], icon: Users },
-    { label: "Support", path: ["/support"], icon: Headphones },
+    { label: "Device Management", path: ["/device-management"], icon: './Images/Sidebar/Device_Management.png' },
+    { label: "User Management", path: ["/user-management"], icon: './Images/Sidebar/User_Management.png' },
+    { label: "Support", path: ["/support"], icon: './Images/Sidebar/Support.png' },
   ],
 };
 
@@ -97,7 +97,7 @@ export default function Sidebar({
             <div className="flex items-center justify-between border-b border-blue-800 p-4 pl-[25px]">
               {!collapsed && (
                 <img
-                  src="/Login/DELHI-IGIA-GMR.png"
+                  src="./Images/Sidebar/Sidebar_Logo.png"
                   alt="Logo"
                   className="lg:h-6 md:h-6 h-9"
                 />
@@ -135,7 +135,7 @@ export default function Sidebar({
 
           <div className="flex items-center gap-3 p-4">
             <img
-              src="/Header/user-image.png"
+              src="./Images/Sidebar/Sidebar_User.png"
               alt="User"
               className="h-12 w-12 rounded-full"
             />
@@ -181,7 +181,7 @@ function MenuItemComponent({
             : "hover:bg-[rgba(239,_246,_255,_0.2)]"
         }`}
     >
-      <Icon size={18} />
+      <img src={Icon} alt={label} className="h-5 w-5" />
 
       {!collapsed && <span className="text-sm">{label}</span>}
 
