@@ -2,7 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { useEffect } from "react";
 import { UserRole } from "@/types";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
-import { fetchProfile } from "@/store/slices/authSlice";
+import { fetchMenu, fetchProfile } from "@/store/slices/authSlice";
 
 import DashboardLayout from "@/layout/DashboardLayout";
 import ProtectedRoute from "./ProtectedRoute";
@@ -31,6 +31,12 @@ export default function App() {
       void dispatch(fetchProfile());
     }
   }, [dispatch, user?.accessToken, user?.profile]);
+
+  useEffect(() => {
+    if (user?.accessToken && !user.menu?.length) {
+      void dispatch(fetchMenu());
+    }
+  }, [dispatch, user?.accessToken, user?.menu]);
 
   return (
     <BrowserRouter>

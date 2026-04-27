@@ -21,6 +21,7 @@ interface AddDeviceModalProps {
 export interface DeviceFormSubmitPayload {
   brand: string;
   model: string;
+  landmark?: string;
   orientation: string;
   locationId: number;
   deviceSize: number;
@@ -30,6 +31,7 @@ interface DeviceFormState {
   serviceId: string;
   brand: string;
   model: string;
+  landmark: string;
   orientation: string;
   locationId: string;
   deviceSize: string;
@@ -52,6 +54,7 @@ const createInitialState = (device?: DeviceRecord | null): DeviceFormState => ({
   serviceId: device?.deviceCode ?? "",
   brand: device?.brand ?? "",
   model: device?.model ?? "",
+  landmark: device?.landmark ?? "",
   orientation: device?.orientation ?? "Landscape",
   locationId: getDeviceLocationId(device),
   deviceSize: device ? String(device.deviceSize) : "",
@@ -95,7 +98,12 @@ export default function AddDeviceModal({
   }, [device, mode]);
 
   useEffect(() => {
-    if (!isEditMode || form.locationId || !device || locationList.length === 0) {
+    if (
+      !isEditMode ||
+      form.locationId ||
+      !device ||
+      locationList.length === 0
+    ) {
       return;
     }
 
@@ -157,7 +165,9 @@ export default function AddDeviceModal({
     }));
   };
 
-  const handleOrientationChange = (value: (typeof orientationOptions)[number]) => {
+  const handleOrientationChange = (
+    value: (typeof orientationOptions)[number],
+  ) => {
     setForm((previous) => ({
       ...previous,
       orientation: value,
@@ -192,6 +202,7 @@ export default function AddDeviceModal({
     return {
       brand: form.brand.trim(),
       model: form.model.trim(),
+      ...(form.landmark.trim() ? { landmark: form.landmark.trim() } : {}),
       orientation: form.orientation,
       locationId,
       deviceSize,
@@ -243,13 +254,18 @@ export default function AddDeviceModal({
       <Modal onClose={() => setStep("form")} className="max-w-md">
         <div className="px-8 py-9 text-center">
           <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-sky-50">
-            <Monitor size={40} className="text-sky-600" />
+            <img
+              src="/Images/DeviceManagement/Add_Device_Confirmation.png"
+              alt="Add Device"
+              className="h-20 w-20"
+            />
           </div>
           <h3 className="mt-6 text-[22px] font-500 leading-tight text-[#333333]">
             Are you sure want to add this Device?
           </h3>
           <p className="mt-4 text-[14px] font-400 leading-6 text-[#566272]">
-            This device will be added and made available for device registration. Do you want to continue?
+            This device will be added and made available for device
+            registration. Do you want to continue?
           </p>
           <div className="mt-8 grid grid-cols-2 gap-3">
             <button
@@ -290,7 +306,7 @@ export default function AddDeviceModal({
 
         <div className="mt-6 grid gap-4 md:grid-cols-2">
           {isEditMode ? (
-            <Field label="* Service ID">
+            <Field label="Service ID*">
               <input
                 name="serviceId"
                 value={form.serviceId}
@@ -300,35 +316,39 @@ export default function AddDeviceModal({
             </Field>
           ) : null}
 
-          <Field label="* Brand">
+          <Field label="Brand*">
             <input
               name="brand"
               value={form.brand}
               onChange={handleChange}
               className={`w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none transition ${
-                isEditMode ? "bg-[#F6F6F6] text-[#566272]" : "focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                isEditMode
+                  ? "bg-[#F6F6F6] text-[#566272]"
+                  : "focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               }`}
-              placeholder="Samsung"
+              placeholder="Enter Brand"
               required
               disabled={isEditMode}
             />
           </Field>
 
-          <Field label="* Model">
+          <Field label="Model*">
             <input
               name="model"
               value={form.model}
               onChange={handleChange}
               className={`w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none transition ${
-                isEditMode ? "bg-[#F6F6F6] text-[#566272]" : "focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                isEditMode
+                  ? "bg-[#F6F6F6] text-[#566272]"
+                  : "focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               }`}
-              placeholder="OLED C1"
+              placeholder="Enter Model"
               required
               disabled={isEditMode}
             />
           </Field>
 
-          <Field label="* Orientation">
+          <Field label="Orientation*">
             <div ref={orientationMenuRef} className="relative">
               <button
                 type="button"
@@ -384,11 +404,13 @@ export default function AddDeviceModal({
             </div>
           </Field>
 
-          <Field label="* Select Location">
+          <Field label="Select Location*">
             <div ref={locationMenuRef} className="relative">
               <button
                 type="button"
-                onClick={() => !isEditMode && setLocationMenuOpen((current) => !current)}
+                onClick={() =>
+                  !isEditMode && setLocationMenuOpen((current) => !current)
+                }
                 disabled={isEditMode}
                 className={`flex w-full items-center justify-between rounded-xl border border-slate-200 px-4 py-3 text-left text-sm outline-none transition ${
                   isEditMode
@@ -437,7 +459,7 @@ export default function AddDeviceModal({
             </div>
           </Field>
 
-          <Field label="* Select Size">
+          <Field label="Select Size*">
             <div className="relative">
               <input
                 name="deviceSize"
@@ -446,9 +468,11 @@ export default function AddDeviceModal({
                 value={form.deviceSize}
                 onChange={handleChange}
                 className={`w-full rounded-xl border border-slate-200 px-4 py-3 pr-16 text-sm outline-none transition ${
-                  isEditMode ? "bg-[#F6F6F6] text-[#566272]" : "focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  isEditMode
+                    ? "bg-[#F6F6F6] text-[#566272]"
+                    : "focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                 }`}
-                placeholder="65"
+                placeholder="Enter Size"
                 required
                 disabled={isEditMode}
               />
@@ -456,6 +480,20 @@ export default function AddDeviceModal({
                 Inch
               </span>
             </div>
+          </Field>
+
+          <Field label="Landmark">
+            <input
+              name="landmark"
+              value={form.landmark}
+              onChange={handleChange}
+              className={`w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none transition ${
+                isEditMode
+                  ? "bg-[#F6F6F6] text-[#566272]"
+                  : "focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              }`}
+              placeholder="Enter Landmark"
+            />
           </Field>
         </div>
 
@@ -487,10 +525,14 @@ export default function AddDeviceModal({
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
+  const isRequired = label.endsWith("*");
+  const labelText = isRequired ? label.slice(0, -1) : label;
+
   return (
     <label className="block">
       <span className="mb-2 block text-[14px] font-400 text-slate-700">
-        {label}
+        {labelText}
+        {isRequired ? <span className="text-[#B4272A]">*</span> : null}
       </span>
       {children}
     </label>

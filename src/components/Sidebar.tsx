@@ -1,5 +1,5 @@
 import {
-  BoomBox,
+  ChevronDown,
   FileText,
   Headphones,
   LayoutDashboard,
@@ -12,57 +12,66 @@ import {
   PanelRightClose,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { useEffect, useState } from "react";
-import { NavLink } from "react-router-dom";
-import { UserRole } from "@/types";
-import { useLocation } from "react-router-dom";
-import { useAppSelector } from "@/store/hooks";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import LogoutConfirmModal from "@/components/LogoutConfirmModal";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { logoutUser } from "@/store/slices/authSlice";
+import type { SidebarMenuItem } from "@/types";
 
 interface MenuItem {
   label: string;
   path: string[];
   icon: string;
+  permission?: string;
 }
 
-const menuConfig: Record<string, MenuItem[]> = {
-  [UserRole.SUPER_ADMIN]: [
-    {
-      label: "Dashboard",
-      path: ["/dashboard"],
-      icon: "/Images/Sidebar/Dashboard.png",
-    },
-    {
-      label: "Ad Management",
-      path: ["/ads-management", "/ads-management/create"],
-      icon: "/Images/Sidebar/Ad_Management.png",
-    },
-    {
-      label: "Notice Management",
-      path: ["/notice-management", "/notice-management/create"],
-      icon: "/Images/Sidebar/Notice_Management.png",
-    },
-    {
-      label: "Ticker Management",
-      path: ["/ticker-management", "/ticker-management/create"],
-      icon: "/Images/Sidebar/Ticker_Management.png",
-    },
-    {
-      label: "Device Management",
-      path: ["/device-management"],
-      icon: "/Images/Sidebar/Device_Management.png",
-    },
-    {
-      label: "User Management",
-      path: ["/user-management"],
-      icon: "/Images/Sidebar/User_Management.png",
-    },
-    {
-      label: "Support",
-      path: ["/support"],
-      icon: "/Images/Sidebar/Support.png",
-    },
-  ],
+interface User {
+  permissions?: string[];
+  menu?: SidebarMenuItem[];
+}
+
+const iconMap: Record<string, string> = {
+  LayoutDashboard: "/Images/Sidebar/Dashboard.png",
+  FileText: "/Images/Sidebar/Ad_Management.png",
+  Megaphone: "/Images/Sidebar/Notice_Management.png",
+  ScrollText: "/Images/Sidebar/Ticker_Management.png",
+  Monitor: "/Images/Sidebar/Device_Management.png",
+  Headphones: "/Images/Sidebar/Support.png",
+  Users: "/Images/Sidebar/User_Management.png",
 };
+
+const routeMap: Record<string, string[]> = {
+  "/dashboard": ["/dashboard"],
+  "/content-management": ["/ads-management", "/ads-management/create"],
+  "/announcement": ["/notice-management", "/notice-management/create"],
+  "/ticker": ["/ticker-management", "/ticker-management/create"],
+  "/device": ["/device-management"],
+  "/support": ["/support"],
+  "/user-management": ["/user-management"],
+};
+
+export function mapBackendMenu(menu: SidebarMenuItem[]): MenuItem[] {
+  if (!Array.isArray(menu)) return [];
+
+  return menu.flatMap((menuItem) => {
+    const mappedPaths = routeMap[menuItem.path];
+    const mappedIcon = iconMap[menuItem.icon];
+
+    if (!mappedPaths || !mappedIcon) {
+      return [];
+    }
+
+    return [
+      {
+        label: menuItem.name,
+        path: mappedPaths,
+        icon: mappedIcon,
+        permission: menuItem.permission || '',
+      },
+    ];
+  });
+}
 
 export default function Sidebar({
   isOpen,
@@ -71,8 +80,14 @@ export default function Sidebar({
   isOpen: boolean;
   setIsOpen: (val: boolean) => void;
 }) {
+  const dispatch = useAppDispatch();
+  const navigate = useNavigate();
   const user = useAppSelector((state) => state.auth.user);
   const [collapsed, setCollapsed] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
+  const [logoutLoading, setLogoutLoading] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const handleResize = () => {
@@ -87,16 +102,59 @@ export default function Sidebar({
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  const menus = menuConfig[user?.role ?? UserRole.SUPER_ADMIN] ?? [];
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        profileMenuRef.current &&
+        !profileMenuRef.current.contains(event.target as Node)
+      ) {
+        setProfileMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const menus = useMemo(
+    () => mapBackendMenu(user?.menu ?? []),
+    [user?.menu, user?.menu?.length],
+  );
+
+  const userPermissions = useMemo(
+    () => new Set(user?.permissions || []),
+    [user?.permissions],
+  );
+
+  const filteredMenus = useMemo(
+    () =>
+      menus.filter(
+        (menu) => !menu.permission || userPermissions.has(menu.permission),
+      ),
+    [menus, userPermissions],
+  );
+
+  const handleLogout = async (): Promise<void> => {
+    try {
+      setLogoutLoading(true);
+      await dispatch(logoutUser());
+      setIsOpen(false);
+      navigate("/login", { replace: true });
+    } finally {
+      setLogoutLoading(false);
+      setLogoutConfirmOpen(false);
+      setProfileMenuOpen(false);
+    }
+  };
 
   return (
     <>
-      {isOpen && (
+      {isOpen ? (
         <div
           className="fixed inset-0 z-40 bg-black/40 md:hidden"
           onClick={() => setIsOpen(false)}
         />
-      )}
+      ) : null}
 
       <aside
         className={`
@@ -111,13 +169,13 @@ export default function Sidebar({
         <div className="flex h-full flex-col justify-between">
           <div>
             <div className="flex items-center justify-between border-b border-blue-800 p-4 pl-[25px]">
-              {!collapsed && (
+              {!collapsed ? (
                 <img
                   src="/Images/Sidebar/Sidebar_Logo.png"
                   alt="Logo"
                   className="lg:h-6 md:h-6 h-5"
                 />
-              )}
+              ) : null}
 
               <div className="flex items-center gap-2">
                 <button
@@ -138,9 +196,9 @@ export default function Sidebar({
             </div>
 
             <nav className="mt-4 lg:space-y-4 space-y-2 px-2">
-              {menus.map((menu) => (
+              {filteredMenus.map((menu) => (
                 <MenuItemComponent
-                  key={menu.path[0]}
+                  key={`${menu.label}-${menu.path?.join("-")}`} // safer key
                   {...menu}
                   collapsed={collapsed}
                   setIsOpen={setIsOpen}
@@ -149,26 +207,76 @@ export default function Sidebar({
             </nav>
           </div>
 
-          <div className="flex items-center gap-3 p-4">
-            <img
-              src="/Images/Sidebar/Sidebar_User.png"
-              alt="User"
-              className="h-12 w-12 rounded-full"
-            />
+          <div ref={profileMenuRef} className="relative p-4">
+            <button
+              type="button"
+              onClick={() => setProfileMenuOpen((current) => !current)}
+              className="flex w-full items-center gap-4 rounded-xl transition"
+              aria-haspopup="menu"
+              aria-expanded={profileMenuOpen}
+              aria-label={user?.profile?.username ?? "User"}
+            >
+              <img
+                src="/Images/Sidebar/Sidebar_User.png"
+                alt="User"
+                className="h-12 w-12 rounded-full border-2 border-white/80 object-cover shadow-[0_10px_24px_rgba(0,0,0,0.2)]"
+              />
 
-            {!collapsed && (
-              <div className="min-w-0">
-                <div className="truncate text-[20px] font-semibold uppercase text-white">
-                  {user?.profile?.username ?? "RAMESH SINGH"}
+              {!collapsed ? (
+                <div className="min-w-0 flex-1 text-left">
+                  <div className="truncate text-[20px] font-semibold uppercase leading-none text-white">
+                    {user?.profile?.username ?? "USER"}
+                  </div>
+                  <div className="mt-1 truncate text-[16px] font-400 text-white/80">
+                    {user?.role ?? "User"}
+                  </div>
                 </div>
-                <div className="text-[16px] text-[#CBCBCB] truncate">
-                  {user?.role ?? "Admin Manager"}
-                </div>
+              ) : null}
+
+              <ChevronDown
+                size={28}
+                className={`ml-auto shrink-0 text-white transition ${
+                  profileMenuOpen ? "rotate-180" : ""
+                }`}
+              />
+            </button>
+
+            {profileMenuOpen && !collapsed ? (
+              <div
+                className="absolute bottom-[calc(100%)] left-[3.25rem] right-4 z-50 overflow-hidden rounded-2xl border border-white/10 bg-white/20 px-5 py-4 shadow-[0_22px_44px_rgba(0,0,0,0.22)] backdrop-blur-sm"
+                role="menu"
+              >
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-4 rounded-xl px-1 py-3 text-left text-white transition hover:bg-white/10"
+                  role="menuitem"
+                >
+                  <img src="/Images/Sidebar/Change_Password.png" alt="Change Password" className="h-5 w-5" />
+                  <span className="text-[14px] font-medium">Change Password</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setLogoutConfirmOpen(true)}
+                  className="flex w-full items-center gap-4 rounded-xl px-1 py-3 text-left text-white transition hover:bg-white/10"
+                  role="menuitem"
+                >
+                  <img src="/Images/Sidebar/Logout.png" alt="Logout" className="h-5 w-5" />
+                  <span className="text-[14px] font-medium">Logout</span>
+                </button>
               </div>
-            )}
+            ) : null}
           </div>
         </div>
       </aside>
+
+      {logoutConfirmOpen ? (
+        <LogoutConfirmModal
+          loading={logoutLoading}
+          onCancel={() => setLogoutConfirmOpen(false)}
+          onConfirm={() => void handleLogout()}
+        />
+      ) : null}
     </>
   );
 }
@@ -199,13 +307,13 @@ function MenuItemComponent({
     >
       <img src={Icon} alt={label} className="h-5 w-5" />
 
-      {!collapsed && <span className="text-sm">{label}</span>}
+      {!collapsed ? <span className="text-sm">{label}</span> : null}
 
-      {collapsed && (
+      {collapsed ? (
         <span className="absolute left-14 z-50 hidden whitespace-nowrap rounded bg-black px-2 py-1 text-xs text-white group-hover:block">
           {label}
         </span>
-      )}
+      ) : null}
     </NavLink>
   );
 }

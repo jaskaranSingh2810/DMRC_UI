@@ -30,6 +30,14 @@ export function getToken(): string | null {
   return getAuthUser()?.accessToken ?? null;
 }
 
+export function getRefreshToken(): string | null {
+  return getAuthUser()?.refreshToken ?? null;
+}
+
+export function isRememberedAuth(): boolean {
+  return Boolean(localStorage.getItem(AUTH_STORAGE_KEY));
+}
+
 export function clearAuthStorage(): void {
   localStorage.removeItem(AUTH_STORAGE_KEY);
   sessionStorage.removeItem(AUTH_STORAGE_KEY);

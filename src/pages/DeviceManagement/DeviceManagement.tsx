@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import {
   AlertTriangle,
@@ -25,6 +25,7 @@ import {
 } from "@/store/slices/deviceSlice";
 import { fetchLocations } from "@/store/slices/locationSlice";
 import type { DeviceRecord } from "@/types";
+import { buildDeviceListRequest } from "./deviceListRequest";
 
 interface StatusBadgeProps {
   status: string;
@@ -42,7 +43,12 @@ type DeviceActionState =
     }
   | null;
 
-type DeviceStatFilter = "all" | "active" | "inactive" | "not_working";
+type DeviceStatFilter =
+  | "all"
+  | "active"
+  | "inactive"
+  | "not_working"
+  | "unregistered";
 
 function StatusBadge({ status }: StatusBadgeProps) {
   const normalizedStatus = status.toLowerCase();
@@ -104,42 +110,6 @@ function resolveDeviceLocationId(
   return Number(matchedLocation?.locationId ?? 0);
 }
 
-function normalizeDeviceStatus(status: string): string {
-  const normalizedStatus = status.toLowerCase();
-
-  if (normalizedStatus === "active") {
-    return "active";
-  }
-
-  if (normalizedStatus === "inactive") {
-    return "inactive";
-  }
-
-  if (normalizedStatus === "error" || normalizedStatus === "not working") {
-    return "not_working";
-  }
-
-  return normalizedStatus;
-}
-
-function getApiDeviceStatus(status: string): string {
-  const normalizedStatus = normalizeDeviceStatus(status);
-
-  if (normalizedStatus === "active") {
-    return "Active";
-  }
-
-  if (normalizedStatus === "inactive") {
-    return "Inactive";
-  }
-
-  if (normalizedStatus === "not_working") {
-    return "Not Working";
-  }
-
-  return status;
-}
-
 export default function DeviceManagement() {
   const dispatch = useAppDispatch();
   const toast = useToast();
@@ -186,61 +156,35 @@ export default function DeviceManagement() {
     }
   }, [dispatch, error, toast]);
 
-  const buildDeviceListRequest = useMemo(
-    () => (pageNumber: number) => {
-      const normalizedCreatedAt = filters.createdAt?.trim();
-      const normalizedStatusFilter = filters.status?.trim();
-      const normalizedSizeFilter = filters.deviceSize?.trim();
-
-      return {
-        page: pageNumber - 1,
-        size: pageSize || 10,
-        ...(selectedLocationId
-          ? { locationIds: [Number(selectedLocationId)] }
-          : {}),
-        ...(filters.deviceCode?.trim()
-          ? { deviceCode: filters.deviceCode.trim() }
-          : {}),
-        ...(filters.brand?.trim() ? { brand: filters.brand.trim() } : {}),
-        ...(filters.model?.trim() ? { model: filters.model.trim() } : {}),
-        ...(selectedStatFilter !== "all"
-          ? {
-              status: getApiDeviceStatus(selectedStatFilter),
-            }
-          : normalizedStatusFilter
-            ? { status: getApiDeviceStatus(normalizedStatusFilter) }
-            : {}),
-        ...(filters.orientation?.trim()
-          ? { orientation: filters.orientation.trim() }
-          : {}),
-        ...(normalizedSizeFilter && !Number.isNaN(Number(normalizedSizeFilter))
-          ? { deviceSize: Number(normalizedSizeFilter) }
-          : {}),
-        ...(filters.createdBy?.trim()
-          ? { createdBy: filters.createdBy.trim() }
-          : {}),
-        ...(normalizedCreatedAt ? { createdAt: normalizedCreatedAt } : {}),
-        ...(sortState
-          ? {
-              sortCriteria: [
-                {
-                  field:
-                    sortState.key === "locations"
-                      ? "locationId"
-                      : sortState.key,
-                  direction: sortState.direction,
-                },
-              ],
-            }
-          : {}),
-      };
-    },
-    [filters, pageSize, selectedLocationId, selectedStatFilter, sortState],
-  );
-
   useEffect(() => {
-    void dispatch(fetchDevices(buildDeviceListRequest(page)));
-  }, [buildDeviceListRequest, dispatch, page]);
+    if (!selectedLocationId && !locationListLoaded) {
+      return;
+    }
+
+    void dispatch(
+      fetchDevices(
+        buildDeviceListRequest({
+          filters,
+          locationList,
+          pageNumber: page,
+          pageSize,
+          selectedLocationId,
+          selectedStatFilter,
+          sortState,
+        }),
+      ),
+    );
+  }, [
+    dispatch,
+    filters,
+    locationList,
+    locationListLoaded,
+    page,
+    pageSize,
+    selectedLocationId,
+    selectedStatFilter,
+    sortState,
+  ]);
 
   useEffect(() => {
     setSelectedStatFilter("all");
@@ -279,6 +223,14 @@ export default function DeviceManagement() {
       filterable: true,
       sortable: true,
     },
+    
+    {
+      label: "Landmark",
+      key: "landmark",
+      filterable: true,
+      sortable: true,
+      render: (row: DeviceRecord) => row.landmark ?? "-",
+    },
 
     { label: "Size", key: "deviceSize", filterable: true, sortable: true },
 
@@ -298,10 +250,10 @@ export default function DeviceManagement() {
       key: "createdAt",
       filterable: true,
       sortable: true,
-      render: (row: DeviceRecord) =>{
-        const d = new Date(row.createdAt);
-        return d.toISOString().split("T")[0];
-      }
+      render: (row: DeviceRecord) => {
+        const d = new Date();
+        return d?.toISOString().split("T")[0];
+      },
     },
 
     {
@@ -354,13 +306,12 @@ export default function DeviceManagement() {
 
   return (
     <div className="space-y-6">
-
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-5">
         <StatCard
           label="Total Devices"
           value={String(summary.totalDevices)}
           accent="violet"
-          icon={'/Images/DeviceManagement/Total_Devices.png'}
+          icon={"/Images/DeviceManagement/Total_Devices.png"}
           isActive={selectedStatFilter === "all"}
           onClick={() => handleStatCardClick("all")}
         />
@@ -368,7 +319,7 @@ export default function DeviceManagement() {
           label="Active Devices"
           value={String(summary.activeDevices)}
           accent="green"
-          icon={'/Images/DeviceManagement/Active_Devices.png'}
+          icon={"/Images/DeviceManagement/Active_Devices.png"}
           isActive={selectedStatFilter === "active"}
           onClick={() => handleStatCardClick("active")}
         />
@@ -376,7 +327,7 @@ export default function DeviceManagement() {
           label="Inactive Devices"
           value={String(summary.inactiveDevices)}
           accent="slate"
-          icon={'/Images/DeviceManagement/Inactive_Devices.png'}
+          icon={"/Images/DeviceManagement/Inactive_Devices.png"}
           isActive={selectedStatFilter === "inactive"}
           onClick={() => handleStatCardClick("inactive")}
         />
@@ -384,9 +335,17 @@ export default function DeviceManagement() {
           label="Not working Devices"
           value={String(summary.notWorkingDevices)}
           accent="red"
-          icon={'/Images/DeviceManagement/Not_Working_Devices.png'}
+          icon={"/Images/DeviceManagement/Not_Working_Devices.png"}
           isActive={selectedStatFilter === "not_working"}
           onClick={() => handleStatCardClick("not_working")}
+        />
+        <StatCard
+          label="Unregistered Devices"
+          value={String(summary.unRegisteredDevices)}
+          accent="red"
+          icon={"/Images/DeviceManagement/UnRegistered_Devices.png"}
+          isActive={selectedStatFilter === "unregistered"}
+          onClick={() => handleStatCardClick("unregistered")}
         />
       </div>
 
@@ -435,7 +394,19 @@ export default function DeviceManagement() {
             );
 
             if (updateDevice.fulfilled.match(result)) {
-              await dispatch(fetchDevices(buildDeviceListRequest(page)));
+              await dispatch(
+                fetchDevices(
+                  buildDeviceListRequest({
+                    filters,
+                    locationList,
+                    pageNumber: page,
+                    pageSize,
+                    selectedLocationId,
+                    selectedStatFilter,
+                    sortState,
+                  }),
+                ),
+              );
               setEditingDevice(null);
             }
           }}
@@ -478,7 +449,19 @@ export default function DeviceManagement() {
             );
 
             if (updateDeviceStatus.fulfilled.match(result)) {
-              await dispatch(fetchDevices(buildDeviceListRequest(page)));
+              await dispatch(
+                fetchDevices(
+                  buildDeviceListRequest({
+                    filters,
+                    locationList,
+                    pageNumber: page,
+                    pageSize,
+                    selectedLocationId,
+                    selectedStatFilter,
+                    sortState,
+                  }),
+                ),
+              );
               setDeviceAction(null);
             }
           }}
@@ -504,7 +487,19 @@ export default function DeviceManagement() {
             );
 
             if (removeDevice.fulfilled.match(result)) {
-              await dispatch(fetchDevices(buildDeviceListRequest(page)));
+              await dispatch(
+                fetchDevices(
+                  buildDeviceListRequest({
+                    filters,
+                    locationList,
+                    pageNumber: page,
+                    pageSize,
+                    selectedLocationId,
+                    selectedStatFilter,
+                    sortState,
+                  }),
+                ),
+              );
               setDeviceAction(null);
               setRemoveRemarks("");
             }
@@ -563,10 +558,8 @@ function StatCard({
           {value}
         </p>
       </div>
-      <div
-        className={`flex h-16 w-16 items-center justify-center rounded-xl`}
-      >
-        <img src={icon} alt={label} className="h-16 w-16" />
+      <div className={`flex h-14 w-14 items-center justify-center rounded-xl`}>
+        <img src={icon} alt={label} className="h-14 w-14" />
       </div>
     </button>
   );
@@ -608,7 +601,11 @@ function DeviceConfirmModal({
           }`}
         >
           {isRemoveAction ? (
-            <Trash2 size={40} className="text-rose-500" />
+            <img
+              src="/Images/DeviceManagement/Remove_Confirmation.png"
+              alt="Remove Device"
+              className="h-20 w-20"
+            />
           ) : (
             <div className="relative">
               <Monitor size={40} className="text-sky-600" />
@@ -627,7 +624,7 @@ function DeviceConfirmModal({
         {isRemoveAction ? (
           <label className="mt-6 block text-left">
             <span className="mb-2 block text-sm font-semibold text-slate-700">
-              * Remarks
+              * Reason
             </span>
             <textarea
               value={remarks}
@@ -646,9 +643,15 @@ function DeviceConfirmModal({
             onClick={() =>
               void (isRemoveAction ? onRemove() : onConfirmStatus())
             }
-            className="rounded-xl bg-custom-gradient px-4 py-3 font-semibold text-white transition hover:opacity-95"
+            className={`rounded-xl px-4 py-3 font-semibold transition
+  ${
+    isRemoveAction && !remarks.trim()
+      ? "bg-[#B8B8B8] cursor-not-allowed opacity-70 text-[#333333]"
+      : "bg-custom-gradient hover:opacity-95 text-white"
+  }`}
+            disabled={isRemoveAction && !remarks.trim() ? true : false}
           >
-            Yes
+            {isRemoveAction ? "Yes, Remove" : "Yes"}
           </button>
           <button
             type="button"

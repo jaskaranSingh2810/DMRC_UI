@@ -1,46 +1,51 @@
-import type { User, UserModule, UserProfile } from "@/types";
+import type { SidebarMenuItem, User, UserModule, UserProfile } from "@/types";
 
 interface LoginPayload {
   accessToken?: string;
-  token?: string;
-  roles?: string[];
-  user?: {
-    roles?: string[];
-  };
+  refreshToken?: string;
+  accessTokenExpiresAt?: number;
 }
 
 function getUserRole(
-  payload: LoginPayload | User,
+  payload: LoginPayload | User | null,
   profile: UserProfile | null
 ): string | null {
-  const payloadRoles = "roles" in payload ? payload.roles : undefined;
-  const nestedUserRoles = "user" in payload ? payload.user?.roles : undefined;
+  if (profile?.role?.name) {
+    return profile.role.name;
+  }
 
-  return (
-    profile?.role?.name ??
-    payloadRoles?.[0] ??
-    nestedUserRoles?.[0] ??
-    null
-  );
+  if (payload && "role" in payload) {
+    return payload.role;
+  }
+
+  return null;
 }
 
 export function normalizeUser(
   data: LoginPayload | User,
-  profile: UserProfile | null = null
+  profile: UserProfile | null = null,
+  menu: SidebarMenuItem[] = []
 ): User {
   const sourceProfile = profile ?? null;
-  const modules: UserModule[] = sourceProfile?.modules ?? [];
+  const sourceModules = sourceProfile?.modules ?? ("modules" in data ? data.modules : []);
+  const modules: UserModule[] = sourceModules.map((moduleItem) => ({
+    ...moduleItem,
+    moduleId: moduleItem.moduleId ?? moduleItem.id,
+    moduleName: moduleItem.moduleName ?? moduleItem.name,
+  }));
   const permissions = modules.flatMap((moduleItem) =>
     moduleItem.permissions.map((permission) => permission.name)
   );
 
   return {
-    accessToken:
-      data.accessToken ??
-      ("token" in data ? data.token ?? null : null),
+    accessToken: data.accessToken ?? null,
+    refreshToken: "refreshToken" in data ? data.refreshToken ?? null : null,
+    accessTokenExpiresAt:
+      "accessTokenExpiresAt" in data ? data.accessTokenExpiresAt ?? null : null,
     role: getUserRole(data, sourceProfile),
     profile: sourceProfile,
     modules,
     permissions,
+    menu: "menu" in data ? data.menu : menu,
   };
 }

@@ -34,6 +34,7 @@ interface DeviceState {
     activeDevices: number;
     inactiveDevices: number;
     notWorkingDevices: number;
+    unRegisteredDevices: number;
   };
 }
 
@@ -56,6 +57,7 @@ const initialState: DeviceState = {
     activeDevices: 0,
     inactiveDevices: 0,
     notWorkingDevices: 0,
+    unRegisteredDevices: 0,
   },
 };
 
@@ -65,6 +67,7 @@ interface PaginatedDevices {
     activeDevices: number;
     inactiveDevices: number;
     notWorkingDevices: number;
+    unRegisteredDevices: number;
   };
   content: DeviceRecord[];
   currentPage: number;
@@ -82,6 +85,7 @@ interface DeviceListRequest {
   deviceCode?: string;
   brand?: string;
   model?: string;
+  landmark?: string;
   status?: string;
   orientation?: string;
   deviceSize?: number;
@@ -100,6 +104,7 @@ interface UpdateDeviceRequest {
   userName: string;
   brand: string;
   model: string;
+  landmark?: string;
   orientation: string;
   locationId: number;
   deviceSize: number;
@@ -136,10 +141,13 @@ export const fetchDevices = createAsyncThunk<
       await axiosInstance.post("/api/v1/dmrc/device/list", {
         page: payload?.page ?? 0,
         size: payload?.size ?? 10,
-        ...(payload?.locationIds?.length ? { locationIds: payload.locationIds } : {}),
+        ...(payload?.locationIds?.length
+          ? { locationIds: payload.locationIds }
+          : {}),
         ...(payload?.deviceCode ? { deviceCode: payload.deviceCode } : {}),
         ...(payload?.brand ? { brand: payload.brand } : {}),
         ...(payload?.model ? { model: payload.model } : {}),
+        ...(payload?.landmark ? { landmark: payload.landmark } : {}),
         ...(payload?.status ? { status: payload.status } : {}),
         ...(payload?.orientation ? { orientation: payload.orientation } : {}),
         ...(typeof payload?.deviceSize === "number"
@@ -216,7 +224,7 @@ export const updateDevice = createAsyncThunk<
   try {
     const response: AxiosResponse<ApiEnvelope<DeviceRecord>> =
       await axiosInstance.patch("/api/v1/dmrc/device/update", payload);
-    
+
     if (!isApiSuccess(response.data)) {
       return rejectWithValue(
         getApiMessage(response.data, "Unable to update device."),

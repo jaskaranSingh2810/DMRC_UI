@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { clearAuthMessages, loginUser } from "@/store/slices/authSlice";
@@ -14,6 +14,7 @@ interface LoginFormState {
 
 export default function Login() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const dispatch = useAppDispatch();
   const toast = useToast();
   const { user, error, loading } = useAppSelector((state) => state.auth);
@@ -40,6 +41,21 @@ export default function Login() {
       toast.error(error, "Login");
     }
   }, [error, toast]);
+
+  useEffect(() => {
+    if (!user?.accessToken) return;
+
+    const isKiosk = searchParams.get("kiosk");
+
+    if (isKiosk === "true") {
+      window.location.href = "http://localhost:8083/device/view?kiosk=true";
+          return;
+    }
+
+    const redirectPath = searchParams.get("redirect") || "/dashboard";
+    navigate(redirectPath, { replace: true });
+
+  }, [user?.accessToken]);
 
   const handleChange = (event: ChangeEvent<HTMLInputElement>): void => {
     const { name, value, type, checked } = event.target;
