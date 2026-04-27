@@ -329,6 +329,7 @@ const authSlice = createSlice({
       action: PayloadAction<string | undefined>,
     ) => {
       state.loading = false;
+      state.user = null;
       state.error = action.payload ?? "Request failed.";
       state.status = "failed";
     };

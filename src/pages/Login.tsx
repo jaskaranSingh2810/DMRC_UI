@@ -31,12 +31,6 @@ export default function Login() {
   }, [dispatch]);
 
   useEffect(() => {
-    if (user?.accessToken) {
-      navigate("/dashboard", { replace: true });
-    }
-  }, [navigate, user?.accessToken]);
-
-  useEffect(() => {
     if (error) {
       toast.error(error, "Login");
     }
@@ -55,14 +49,27 @@ export default function Login() {
     const redirectPath = searchParams.get("redirect") || "/dashboard";
     navigate(redirectPath, { replace: true });
 
-  }, [user?.accessToken]);
+  }, [navigate, searchParams, user?.accessToken]);
 
   const handleChange = (event: ChangeEvent<HTMLInputElement>): void => {
     const { name, value, type, checked } = event.target;
+
+    if (error) {
+      dispatch(clearAuthMessages());
+    }
+
     setForm((previous) => ({
       ...previous,
       [name]: type === "checkbox" ? checked : value,
     }));
+  };
+
+  const handlePasswordToggle = () => {
+    if (error) {
+      dispatch(clearAuthMessages());
+    }
+
+    setShowPassword((previous) => !previous);
   };
 
   const handleLogin = async (
@@ -79,8 +86,8 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen">
-      <div className="mx-auto flex overflow-hidden border border-white/70 bg-white shadow-[0_40px_120px_rgba(15,23,42,0.24)]">
+    <div className="min-h-screen bg-white">
+      <div className="mx-auto flex min-h-screen overflow-hidden border border-white/70 bg-white shadow-[0_40px_120px_rgba(15,23,42,0.24)]">
         <div className="relative hidden overflow-hidden lg:block flex-[0.5]">
           <img
             src="/Images/Login/Login_Left.png"
@@ -147,7 +154,7 @@ export default function Login() {
                 <button
                   type="button"
                   className="absolute right-3 top-[34px] rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-                  onClick={() => setShowPassword((previous) => !previous)}
+                  onClick={handlePasswordToggle}
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -165,12 +172,12 @@ export default function Login() {
                   />
                   Remember me
                 </label>
-                <Link
+                {/* <Link
                   to="/forgot-password"
                   className="font-semibold text-blue-700 transition hover:text-blue-900"
                 >
                   Forgot Password
-                </Link>
+                </Link> */}
               </div>
             </div>
 
