@@ -564,9 +564,9 @@ function StatCard({
         </p>
       </div>
       <div
-        className={`flex h-12 w-12 items-center justify-center rounded-xl`}
+        className={`flex h-16 w-16 items-center justify-center rounded-xl`}
       >
-        <img src={icon} alt={label} className="h-12 w-12" />
+        <img src={icon} alt={label} className="h-16 w-16" />
       </div>
     </button>
   );
