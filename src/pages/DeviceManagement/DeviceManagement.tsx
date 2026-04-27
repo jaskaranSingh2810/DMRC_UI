@@ -48,7 +48,7 @@ type DeviceStatFilter =
   | "active"
   | "inactive"
   | "not_working"
-  | "unregistered";
+  | "unRegistered";
 
 function StatusBadge({ status }: StatusBadgeProps) {
   const normalizedStatus = status.toLowerCase();
@@ -344,8 +344,8 @@ export default function DeviceManagement() {
           value={String(summary.unRegisteredDevices)}
           accent="red"
           icon={"/Images/DeviceManagement/UnRegistered_Devices.png"}
-          isActive={selectedStatFilter === "unregistered"}
-          onClick={() => handleStatCardClick("unregistered")}
+          isActive={selectedStatFilter === "unRegistered"}
+          onClick={() => handleStatCardClick("unRegistered")}
         />
       </div>
 

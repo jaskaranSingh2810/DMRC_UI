@@ -487,11 +487,7 @@ export default function AddDeviceModal({
               name="landmark"
               value={form.landmark}
               onChange={handleChange}
-              className={`w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none transition ${
-                isEditMode
-                  ? "bg-[#F6F6F6] text-[#566272]"
-                  : "focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-              }`}
+              className={'w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100'}
               placeholder="Enter Landmark"
             />
           </Field>

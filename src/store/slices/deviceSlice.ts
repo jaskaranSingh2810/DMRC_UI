@@ -202,7 +202,7 @@ export const createDevice = createAsyncThunk<
 >("devices/create", async (payload, { rejectWithValue }) => {
   try {
     const response: AxiosResponse<ApiEnvelope<DeviceRecord>> =
-      await axiosInstance.post("/api/v1/dmrc/device/create", payload);
+      await axiosInstance.post("/api/v1/dmrc/device/create-device", payload);
 
     if (!isApiSuccess(response.data)) {
       return rejectWithValue(
