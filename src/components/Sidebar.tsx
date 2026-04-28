@@ -119,7 +119,7 @@ export default function Sidebar({
   const menus = useMemo(
     () => mapBackendMenu(user?.menu ?? []),
     [user?.menu, user?.menu?.length],
-  );
+  );  
 
   const userPermissions = useMemo(
     () => new Set(user?.permissions || []),
@@ -204,6 +204,14 @@ export default function Sidebar({
                   setIsOpen={setIsOpen}
                 />
               ))}
+              <MenuItemComponent
+                  key={`User-Management`} // safer key
+                  label="User Management"
+                  path={["/user-management", "/user-management/create"]}
+                  icon="/Images/Sidebar/User_Management.png"
+                  collapsed={collapsed}
+                  setIsOpen={setIsOpen}
+                />
             </nav>
           </div>
 

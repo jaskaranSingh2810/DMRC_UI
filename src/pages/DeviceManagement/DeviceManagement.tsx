@@ -550,7 +550,7 @@ function StatCard({
       onClick={onClick}
       aria-label={label}
       aria-pressed={isActive}
-      className={`flex items-center justify-between rounded-[8px] border bg-white px-5 py-4 text-left shadow-[rgba(0, 0, 0, 0.05)] transition ${isActive ? "border-[#5E1B7F] ring-2 ring-[#5E1B7F1F]" : accentStyles[accent].card}`}
+      className={`flex items-center gap-2 justify-between rounded-[8px] border bg-white px-5 py-4 text-left shadow-[rgba(0, 0, 0, 0.05)] transition ${isActive ? "border-[#5E1B7F] ring-2 ring-[#5E1B7F1F]" : accentStyles[accent].card}`}
     >
       <div>
         <p className="text-[16px] font-medium text-slate-700">{label}</p>

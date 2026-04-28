@@ -543,7 +543,7 @@ function StatCard({
       onClick={onClick}
       aria-label={label}
       aria-pressed={isActive}
-      className={`flex items-center justify-between rounded-[8px] border bg-white px-5 py-4 text-left shadow-[rgba(0,0,0,0.05)] transition ${
+      className={`flex items-center gap-2 justify-between rounded-[8px] border bg-white px-5 py-4 text-left shadow-[rgba(0,0,0,0.05)] transition ${
         isActive
           ? "border-[#5E1B7F] ring-2 ring-[#5E1B7F1F]"
           : accentStyles[accent].card
@@ -579,24 +579,22 @@ function UserStatusConfirmModal({
     <Modal onClose={onClose} className="max-w-xl">
       <div className="px-8 py-9 text-center">
         <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-sky-50">
-          <ShieldCheck size={36} className="text-sky-600" />
+          <img src="/Images/UserManagement/Deactivate_Users.png" className="h-20 w-20" alt="Shield Check" />
         </div>
-        <h3 className="mt-6 text-[24px] font-semibold leading-tight text-slate-900">
-          Are you sure want to mark {user.employeeName} as {nextStatus}?
+        <h3 className="mt-6 text-[22px] font-medium leading-tight text-slate-900">
+          Deactivate User
         </h3>
-        <p className="mt-4 text-sm leading-6 text-slate-500">
-          This will update the account state for{" "}
-          <span className="font-semibold">{user.empId}</span> and affect whether
-          the user can access assigned modules.
+        <p className="mt-4 text-sm leading-6 text-slate-500 text-[14px] font-normal">
+          Are you sure you want to deactivate this user?
         </p>
 
         <div className="mt-8 grid grid-cols-2 gap-3">
           <button
-            type="button"
+            type="button" 
             onClick={() => void onConfirm()}
             className="rounded-xl bg-custom-gradient px-4 py-3 font-semibold text-white transition hover:opacity-95"
           >
-            Confirm
+            Yes
           </button>
           <button
             type="button"
