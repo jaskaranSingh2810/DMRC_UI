@@ -204,14 +204,6 @@ export default function Sidebar({
                   setIsOpen={setIsOpen}
                 />
               ))}
-              <MenuItemComponent
-                  key={`User-Management`} // safer key
-                  label="User Management"
-                  path={["/user-management", "/user-management/create"]}
-                  icon="/Images/Sidebar/User_Management.png"
-                  collapsed={collapsed}
-                  setIsOpen={setIsOpen}
-                />
             </nav>
           </div>
 

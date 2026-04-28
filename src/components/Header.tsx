@@ -8,6 +8,7 @@ import {
 } from "@/store/slices/deviceSlice";
 import { fetchLocations } from "@/store/slices/locationSlice";
 import { setSelectedModule } from "@/store/slices/userSlice";
+import { userModuleOptions } from "@/pages/UserManagement/userManagementData";
 import { useModal } from "./ModalContext";
 
 type HeaderAction =
@@ -15,11 +16,6 @@ type HeaderAction =
       type: "navigate";
       label: string;
       path: string;
-    }
-  | {
-      type: "modal";
-      label: string;
-      modal: "ADD_DEVICE" | "ADD_USER";
     };
 
 const headerConfig: Record<
@@ -56,17 +52,17 @@ const headerConfig: Record<
   "/device-management": {
     title: "Device Management",
     action: {
-      type: "modal",
+      type: "navigate",
       label: "Add New Device",
-      modal: "ADD_DEVICE",
+      path: "/device-management",
     },
   },
   "/user-management": {
     title: "User Management",
     action: {
-      type: "modal",
+      type: "navigate",
       label: "Add New User",
-      modal: "ADD_USER",
+      path: "/user-management/create",
     },
   },
 };
@@ -90,7 +86,7 @@ export default function Header({
   );
   const { items: locationList, listLoaded: locationListLoaded } =
     useAppSelector((state) => state.locations);
-  const { items: users, selectedModule } = useAppSelector((state) => state.users);
+  const { selectedModule } = useAppSelector((state) => state.users);
 
   const config = Object.entries(headerConfig).find(
     ([key]) => pathname === key || pathname.startsWith(key + "/"),
@@ -127,15 +123,7 @@ export default function Header({
     locationList.find(
       (location) => String(location.locationId) === String(selectedLocationId),
     )?.locationName ?? "All Locations";
-  const availableModules = Array.from(
-    new Set(
-      users.flatMap((user) =>
-        (user.moduleAccess ?? [])
-          .map((moduleName) => moduleName.trim())
-          .filter(Boolean),
-      ),
-    ),
-  ).sort((left, right) => left.localeCompare(right));
+  const availableModules = userModuleOptions.map((moduleOption) => moduleOption.name);
   const selectedModuleLabel =
     selectedModule === "all" ? "All Modules" : selectedModule;
 
@@ -143,11 +131,12 @@ export default function Header({
     if (!config.action) return;
 
     if (config.action.type === "navigate") {
-      navigate(config.action.path);
-    }
+      if (pathname === "/device-management") {
+        openModal("ADD_DEVICE");
+        return;
+      }
 
-    if (config.action.type === "modal") {
-      openModal(config.action.modal);
+      navigate(config.action.path);
     }
   };
 

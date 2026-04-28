@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, ReactNode } from "react";
 import AddDeviceModal from "@/components/DeviceManagement/AddDeviceModal";
 
-export type ModalType = "ADD_DEVICE" | "ADD_USER" | null;
+export type ModalType = "ADD_DEVICE" | null;
 
 interface ModalContextType {
   openModal: (type: ModalType) => void;

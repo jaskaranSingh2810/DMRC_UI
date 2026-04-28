@@ -42,7 +42,7 @@ export default function Login() {
     const isKiosk = searchParams.get("kiosk");
 
     if (isKiosk === "true") {
-      window.location.href = "http://localhost:8083/device/view?kiosk=true";
+      window.location.href = "http://localhost:8086/device/view?kiosk=true";
           return;
     }
 

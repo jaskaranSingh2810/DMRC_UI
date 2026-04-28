@@ -15,6 +15,7 @@ import Unauthorized from "./Unauthorized";
 import AdsManagement from "./AdsManagement/AdsManagement";
 import DeviceManagement from "./DeviceManagement/DeviceManagement";
 import UserManagement from "./UserManagement/UserManagement";
+import UserFormPage from "./UserManagement/UserFormPage";
 import Support from "./Support";
 import CreateNewAd from "./AdsManagement/CreateNewAd";
 import CreateNotice from "./NoticeManagement/CreateNotice";
@@ -142,6 +143,24 @@ export default function App() {
             element={
               <ProtectedRoute allowedRoles={[UserRole.SUPER_ADMIN]}>
                 <UserManagement />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/user-management/create"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.SUPER_ADMIN]}>
+                <UserFormPage mode="create" />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/user-management/:userId/edit"
+            element={
+              <ProtectedRoute allowedRoles={[UserRole.SUPER_ADMIN]}>
+                <UserFormPage mode="edit" />
               </ProtectedRoute>
             }
           />

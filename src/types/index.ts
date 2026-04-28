@@ -174,12 +174,46 @@ export interface ManagedUserRecord {
   password?: string | null;
   locationAccess?: string[] | null;
   moduleAccess?: string[] | null;
+  accessAssignments?: UserAccessAssignment[] | null;
   lastLoggedIn?: string | null;
   createdOn?: string | null;
   createdBy?: string | null;
   status: string;
   updatedAt?: string | null;
   updatedBy?: string | null;
+}
+
+export interface UserAccessAssignment {
+  moduleId: string;
+  moduleName: string;
+  locationIds: string[];
+  locationNames: string[];
+}
+
+export interface UserLocationOption {
+  id: string;
+  name: string;
+}
+
+export interface UserModuleOption {
+  id: string;
+  name: string;
+}
+
+export interface ManagedUserFormPayload {
+  empId: string;
+  employeeName: string;
+  emailId: string;
+  mobileNumber: string;
+  password: string;
+  accessAssignments: UserAccessAssignment[];
+  userName: string;
+}
+
+export interface ManagedUserStatusSummary {
+  totalUsers: number;
+  activeUsers: number;
+  inactiveUsers: number;
 }
 
 export interface ApiEnvelope<TData> {
