@@ -1,17 +1,9 @@
 import {
   ChevronDown,
-  FileText,
-  Headphones,
-  LayoutDashboard,
-  Megaphone,
-  Monitor,
-  ScrollText,
-  Users,
   X,
   PanelRightOpen,
   PanelRightClose,
 } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import LogoutConfirmModal from "@/components/LogoutConfirmModal";
@@ -43,10 +35,10 @@ const iconMap: Record<string, string> = {
 
 const routeMap: Record<string, string[]> = {
   "/dashboard": ["/dashboard"],
-  "/content-management": ["/ads-management", "/ads-management/create"],
-  "/announcement": ["/notice-management", "/notice-management/create"],
-  "/ticker": ["/ticker-management", "/ticker-management/create"],
-  "/device": ["/device-management"],
+  "/ads-management": ["/ads-management", "/ads-management/create"],
+  "/notice-management": ["/notice-management", "/notice-management/create"],
+  "/ticker-management": ["/ticker-management", "/ticker-management/create"],
+  "/device-management": ["/device-management"],
   "/support": ["/support"],
   "/user-management": ["/user-management"],
 };
@@ -239,11 +231,12 @@ export default function Sidebar({
                   profileMenuOpen ? "rotate-180" : ""
                 }`}
               />
+              
             </button>
 
             {profileMenuOpen && !collapsed ? (
               <div
-                className="absolute bottom-[calc(100%)] left-[3.25rem] right-4 z-50 overflow-hidden rounded-2xl border border-white/10 bg-white/20 px-5 py-4 shadow-[0_22px_44px_rgba(0,0,0,0.22)] backdrop-blur-sm"
+                className="absolute bottom-[calc(100%)] left-[3.25rem] right-4 z-50 overflow-hidden rounded-2xl border border-white/10 bg-white/20 px-4 py-4 shadow-[0_22px_44px_rgba(0,0,0,0.22)] backdrop-blur-sm"
                 role="menu"
               >
                 <button

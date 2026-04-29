@@ -141,8 +141,8 @@ export const fetchDevices = createAsyncThunk<
       await axiosInstance.post("/api/v1/dmrc/device/list", {
         page: payload?.page ?? 0,
         size: payload?.size ?? 10,
-        ...(payload?.locationIds?.length
-          ? { locationIds: payload.locationIds }
+        ...("locationIds" in (payload ?? {})
+          ? { locationIds: payload?.locationIds ?? [] }
           : {}),
         ...(payload?.deviceCode ? { deviceCode: payload.deviceCode } : {}),
         ...(payload?.brand ? { brand: payload.brand } : {}),

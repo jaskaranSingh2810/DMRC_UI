@@ -7,7 +7,7 @@ type DeviceStatFilter =
   | "active"
   | "inactive"
   | "not_working"
-  | "unregistered";
+  | "unRegistered";
 
 type SortState = {
   key: string;
@@ -22,7 +22,7 @@ export interface DeviceSortCriteria {
 export interface DeviceListRequest {
   page: number;
   size: number;
-  locationIds?: number[];
+  locationIds: number[];
   deviceCode?: string;
   brand?: string;
   model?: string;
@@ -91,7 +91,7 @@ export function buildDeviceListRequest({
   return {
     page: pageNumber - 1,
     size: pageSize || 10,
-    ...(locationIds.length ? { locationIds } : {}),
+    locationIds,
     ...(filters.deviceCode?.trim()
       ? { deviceCode: filters.deviceCode.trim() }
       : {}),

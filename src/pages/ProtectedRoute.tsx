@@ -12,23 +12,23 @@ export default function ProtectedRoute({
   children,
   allowedRoles,
 }: ProtectedRouteProps) {
-  // const { user, loading } = useAppSelector((state) => state.auth);
+  const { user, loading } = useAppSelector((state) => state.auth);
 
-  // if (loading) {
-  //   return (
-  //     <div className="flex min-h-screen items-center justify-center bg-slate-100 text-slate-600">
-  //       Loading...
-  //     </div>
-  //   );
-  // }
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-100 text-slate-600">
+        Loading...
+      </div>
+    );
+  }
 
-  // if (!user?.accessToken) {
-  //   return <Navigate to="/login" replace />;
-  // }
+  if (!user?.accessToken) {
+    return <Navigate to="/login" replace />;
+  }
 
-  // if (user.role === "super_admin") {
-  //   return <>{children}</>;
-  // }
+  if (user.role === "super_admin") {
+    return <>{children}</>;
+  }
 
   // if (allowedRoles && user.role && !allowedRoles.includes(user.role)) {
   //   return <Navigate to="/unauthorized" replace />;

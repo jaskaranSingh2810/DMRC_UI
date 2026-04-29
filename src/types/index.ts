@@ -3,6 +3,8 @@ export enum UserRole {
   AD_MANAGER = "ad_manager",
   NOTICE_MANAGER = "notice_manager",
   TICKER_MANAGER = "ticker_manager",
+  DEVICE_MANAGER = "device_manager",
+  USER_MANAGER = "user_manager",
 }
 
 export type AsyncStatus = "idle" | "loading" | "succeeded" | "failed";

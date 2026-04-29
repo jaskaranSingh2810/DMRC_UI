@@ -39,17 +39,18 @@ export default function Login() {
   useEffect(() => {
     if (!user?.accessToken) return;
 
-    const isKiosk = searchParams.get("kiosk");
+    const isKiosk = searchParams.get("kiosk") === "true";
 
-    if (isKiosk === "true") {
-      window.location.href = "http://localhost:8086/device/view?kiosk=true";
-          return;
+    if (isKiosk) {
+      const encodedUser = encodeURIComponent(JSON.stringify(user));
+      window.location.href = `http://localhost:8086/device/view?kiosk=true&user=${encodedUser}`;
+      return;
     }
 
     const redirectPath = searchParams.get("redirect") || "/dashboard";
-    navigate(redirectPath, { replace: true });
 
-  }, [navigate, searchParams, user?.accessToken]);
+    navigate(redirectPath, { replace: true });
+  }, [navigate, searchParams, user]);
 
   const handleChange = (event: ChangeEvent<HTMLInputElement>): void => {
     const { name, value, type, checked } = event.target;
@@ -86,8 +87,8 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-white">
-      <div className="mx-auto flex min-h-screen overflow-hidden border border-white/70 bg-white shadow-[0_40px_120px_rgba(15,23,42,0.24)]">
+    <div className="h-screen overflow-hidden bg-white">
+      <div className="mx-auto flex h-full overflow-hidden border border-white/70 bg-white shadow-[0_40px_120px_rgba(15,23,42,0.24)]">
         <div className="relative hidden overflow-hidden lg:block flex-[0.5]">
           <img
             src="/Images/Login/Login_Left.png"
@@ -96,7 +97,7 @@ export default function Login() {
           />
         </div>
 
-        <div className="flex flex-[0.5] w-full items-center justify-center bg-white px-6 py-8 sm:px-8 lg:w-[42%] lg:px-12">
+        <div className="flex h-full w-full flex-[0.5] items-center justify-center overflow-hidden bg-white px-6 py-8 sm:px-8 lg:w-[42%] lg:px-12">
           <div className="absolute top-[30px] right-[30px] overflow-hidden">
             <img
               src="/Images/Login/Delhi_Metro.png"

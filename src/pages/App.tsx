@@ -22,6 +22,7 @@ import CreateNotice from "./NoticeManagement/CreateNotice";
 import CreateTicker from "./TickerManagement/CreateTicker";
 import ForgotPassword from "./ForgotPassword";
 import ResetPassword from "./ResetPassword";
+import Logout from "./Logout";
 
 export default function App() {
   const dispatch = useAppDispatch();
@@ -132,7 +133,7 @@ export default function App() {
           <Route
             path="/device-management"
             element={
-              <ProtectedRoute allowedRoles={[UserRole.SUPER_ADMIN]}>
+              <ProtectedRoute allowedRoles={[UserRole.SUPER_ADMIN, UserRole.DEVICE_MANAGER]}>
                 <DeviceManagement />
               </ProtectedRoute>
             }
@@ -141,7 +142,7 @@ export default function App() {
           <Route
             path="/user-management"
             element={
-              <ProtectedRoute allowedRoles={[UserRole.SUPER_ADMIN]}>
+              <ProtectedRoute allowedRoles={[UserRole.SUPER_ADMIN, UserRole.USER_MANAGER]}>
                 <UserManagement />
               </ProtectedRoute>
             }
@@ -150,7 +151,7 @@ export default function App() {
           <Route
             path="/user-management/create"
             element={
-              <ProtectedRoute allowedRoles={[UserRole.SUPER_ADMIN]}>
+              <ProtectedRoute allowedRoles={[UserRole.SUPER_ADMIN, UserRole.USER_MANAGER]}>
                 <UserFormPage mode="create" />
               </ProtectedRoute>
             }
@@ -159,13 +160,14 @@ export default function App() {
           <Route
             path="/user-management/:userId/edit"
             element={
-              <ProtectedRoute allowedRoles={[UserRole.SUPER_ADMIN]}>
+              <ProtectedRoute allowedRoles={[UserRole.SUPER_ADMIN, UserRole.USER_MANAGER]}>
                 <UserFormPage mode="edit" />
               </ProtectedRoute>
             }
           />
 
           <Route path="/support" element={<Support />} />
+          <Route path="/logout" element={<Logout />} />
         </Route>
 
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
