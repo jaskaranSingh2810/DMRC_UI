@@ -56,6 +56,11 @@ export default function DataTable<T>({
   const [filterDrafts, setFilterDrafts] = useState<Record<string, string>>({});
   const [filterPosition, setFilterPosition] = useState({ top: 0, left: 0 });
 
+  const openFilterColumn = columns.find(
+    (column) => String(column.key) === openFilterKey,
+  );
+  const openFilterType = openFilterColumn?.filterType ?? "text";
+
   const updateFilterPosition = (key: string, target?: HTMLElement | null) => {
     const anchor = target ?? filterButtonRefs.current[key];
 
@@ -294,18 +299,23 @@ export default function DataTable<T>({
               className="z-[9999] w-64 rounded-2xl border border-slate-200 bg-white p-3 shadow-[0_18px_40px_rgba(15,23,42,0.14)]"
             >
               <div className="relative">
-                <Search
-                  size={15}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                />
+                {openFilterType === "text" ? (
+                  <Search
+                    size={15}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                  />
+                ) : null}
                 <input
-                  type="text"
+                  type={openFilterType}
                   value={filterDrafts[openFilterKey] ?? ""}
-                  placeholder={`Filter ${
-                    columns.find((col) => String(col.key) === openFilterKey)?.label ??
-                    ""
+                  placeholder={
+                    openFilterType === "text"
+                      ? `Filter ${openFilterColumn?.label ?? ""}`
+                      : undefined
+                  }
+                  className={`w-full rounded-xl border border-slate-200 py-2.5 pr-9 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 ${
+                    openFilterType === "text" ? "pl-9" : "pl-3"
                   }`}
-                  className="w-full rounded-xl border border-slate-200 py-2.5 pl-9 pr-9 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                   onChange={(event) => {
                     const nextValue = event.target.value;
                     setFilterDrafts((previous) => ({
@@ -327,8 +337,7 @@ export default function DataTable<T>({
                     }}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
                     aria-label={`Clear ${
-                      columns.find((col) => String(col.key) === openFilterKey)?.label ??
-                      "column"
+                      openFilterColumn?.label ?? "column"
                     } filter`}
                   >
                     <X size={14} />

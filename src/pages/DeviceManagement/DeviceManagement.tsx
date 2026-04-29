@@ -11,6 +11,7 @@ import {
 import AddDeviceModal from "@/components/DeviceManagement/AddDeviceModal";
 import ActionMenu from "@/components/Table/ActionMenu";
 import DataTable from "@/components/Table/DataTable";
+import type { Column } from "@/components/Table/types";
 import type { SortState } from "@/components/Table/types";
 import Modal from "@/components/ui/Modal";
 import { useToast } from "@/hooks/useToast";
@@ -110,6 +111,15 @@ function resolveDeviceLocationId(
   return Number(matchedLocation?.locationId ?? 0);
 }
 
+function formatCreatedAt(value?: string): string {
+  if (!value) {
+    return "-";
+  }
+
+  const [datePart] = value.split("T");
+  return datePart || "-";
+}
+
 export default function DeviceManagement() {
   const dispatch = useAppDispatch();
   const toast = useToast();
@@ -205,7 +215,7 @@ export default function DeviceManagement() {
     });
   };
 
-  const columns = [
+  const columns: Column<DeviceRecord>[] = [
     {
       label: "Device ID",
       key: "deviceCode",
@@ -249,11 +259,9 @@ export default function DeviceManagement() {
       label: "Created On",
       key: "createdAt",
       filterable: true,
+      filterType: "date",
       sortable: true,
-      render: (row: DeviceRecord) => {
-        const d = new Date();
-        return d?.toISOString().split("T")[0];
-      },
+      render: (row: DeviceRecord) => formatCreatedAt(row.createdAt),
     },
 
     {

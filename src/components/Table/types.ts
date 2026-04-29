@@ -4,6 +4,7 @@ export interface Column<T> {
   label: string;
   key: keyof T | string;
   filterable?: boolean;
+  filterType?: "text" | "date";
   sortable?: boolean;
   render?: (row: T) => ReactNode;
 }

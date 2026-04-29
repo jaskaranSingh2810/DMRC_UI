@@ -114,6 +114,7 @@ interface UpdateDeviceStatusRequest {
   locationId: number;
   deviceCode: string;
   status: "Active" | "Inactive";
+  landmark?: string;
 }
 
 interface RemoveDeviceRequest {
@@ -243,11 +244,14 @@ export const updateDeviceStatus = createAsyncThunk<
   { rejectValue: string }
 >("devices/updateStatus", async (payload, { rejectWithValue }) => {
   try {
+    const landmarkQuery = payload.landmark?.trim()
+      ? `?landmark=${encodeURIComponent(payload.landmark.trim())}`
+      : "";
     const response: AxiosResponse<ApiEnvelope<DeviceRecord>> =
       await axiosInstance.post(
         `/api/v1/dmrc/device/status/${payload.locationId}/${encodeURIComponent(
           payload.deviceCode,
-        )}/${payload.status}`,
+        )}/${payload.status}${landmarkQuery}`,
       );
 
     if (!isApiSuccess(response.data)) {
