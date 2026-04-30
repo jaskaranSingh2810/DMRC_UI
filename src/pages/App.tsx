@@ -1,5 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { UserRole } from "@/types";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { fetchMenu, fetchProfile } from "@/store/slices/authSlice";
@@ -29,6 +29,10 @@ import PlayerPage from "./PlayerPage";
 export default function App() {
   const dispatch = useAppDispatch();
   const user = useAppSelector((state) => state.auth.user);
+  const isKioskSession = useMemo(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    return searchParams.get("kiosk") === "true";
+  }, []);
 
   useEffect(() => {
     if (user?.accessToken && !user.profile) {
@@ -42,6 +46,37 @@ export default function App() {
     }
   }, [dispatch, user?.accessToken, user?.menu]);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const blocked =
+        e.key === "F12" ||
+        e.key === "F11" ||
+        e.key === "Escape" ||
+        (e.ctrlKey && e.shiftKey && ["I", "J", "C"].includes(e.key)) ||
+        (e.ctrlKey && e.key === "U") ||
+        (e.altKey && e.key === "F4") ||
+        (e.ctrlKey &&
+          ["w", "W", "r", "R", "l", "L", "t", "T", "n", "N"].includes(e.key));
+
+      if (blocked) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+
+    const handleContextMenu = (e: MouseEvent) => e.preventDefault();
+
+    if(isKioskSession){
+      document.addEventListener("keydown", handleKeyDown, true);
+      document.addEventListener("contextmenu", handleContextMenu, true);
+  
+      return () => {
+        document.removeEventListener("keydown", handleKeyDown, true);
+        document.removeEventListener("contextmenu", handleContextMenu, true);
+      };
+    }
+  }, [isKioskSession]);
+  
   return (
     <BrowserRouter>
       <Routes>
