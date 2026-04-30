@@ -24,6 +24,7 @@ import ForgotPassword from "./ForgotPassword";
 import ResetPassword from "./ResetPassword";
 import Logout from "./Logout";
 import DeviceRegistration from "./DeviceRegistration";
+import PlayerPage from "./PlayerPage";
 
 export default function App() {
   const dispatch = useAppDispatch();
@@ -53,6 +54,15 @@ export default function App() {
           element={
             <ProtectedRoute>
               <DeviceRegistration />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/device/player"
+          element={
+            <ProtectedRoute>
+              <PlayerPage />
             </ProtectedRoute>
           }
         />

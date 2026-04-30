@@ -2,6 +2,11 @@ import { Check, ChevronDown, LogOut, Monitor, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "@/hooks/useToast";
 import { buildDeviceListRequest } from "@/pages/DeviceManagement/deviceListRequest";
+import {
+  loadStoredRegisteredDevice,
+  saveRegisteredDevice,
+  type StoredRegisteredDevice,
+} from "@/pages/deviceRegistrationStorage";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
   clearDeviceMessages,
@@ -12,6 +17,7 @@ import {
 import { fetchLocations } from "@/store/slices/locationSlice";
 import type { DeviceLocation, DeviceRecord } from "@/types";
 import { getAuthUser } from "@/utils/auth";
+import { useNavigate } from "react-router-dom";
 
 type UserDetails = {
   displayName: string;
@@ -363,7 +369,31 @@ const pageStyles = `
     line-height: 1.45;
     color: #5e6a7d;
   }
-  .modal-action { max-width: 254px; margin: 0 auto; }
+  .modal-action { max-width: 254px; margin: 0 auto; padding: 8px; }
+  .modal-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-width: 320px;
+    margin: 0 auto;
+  }
+  .device-summary {
+    margin: 0 auto 24px;
+    padding: 16px 18px;
+    border-radius: 14px;
+    border: 1px solid #e5e7eb;
+    background: #f8fafc;
+    text-align: left;
+  }
+  .device-summary-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 6px 0;
+    font-size: 13px;
+    color: #475467;
+  }
+  .device-summary-row strong { color: #101828; }
 
   @media (max-width: 920px) {
     .register-card { width: min(100%, 440px); grid-template-columns: 1fr; gap: 16px; padding: 16px; }
@@ -395,7 +425,9 @@ function getInitials(name: string): string {
 }
 
 function formatRole(role: string): string {
-  const normalized = String(role || "User").replace(/[_-]+/g, " ").trim();
+  const normalized = String(role || "User")
+    .replace(/[_-]+/g, " ")
+    .trim();
   if (!normalized) {
     return "User";
   }
@@ -413,6 +445,23 @@ function getStoredUserDetails(): UserDetails {
     displayName: authUser?.profile?.username || "Guest User",
     displayRole: formatRole(authUser?.role || "User"),
     avatarUrl: "",
+  };
+}
+
+function toStoredDeviceRecord(device: StoredRegisteredDevice): DeviceRecord {
+  return {
+    id: 0,
+    deviceCode: device.deviceCode,
+    brand: device.brand || "-",
+    model: "",
+    landmark: device.landmark,
+    orientation: device.orientation || "-",
+    locationId: device.locationId,
+    deviceSize: device.deviceSize || 0,
+    createdAt: "",
+    createdBy: "",
+    status: "ACTIVE",
+    locationName: device.locationName,
   };
 }
 
@@ -445,6 +494,7 @@ function DropdownToggle({
 
 export default function DeviceRegistration() {
   const dispatch = useAppDispatch();
+  const navigate = useNavigate();
   const toast = useToast();
   const {
     items: deviceList,
@@ -458,18 +508,23 @@ export default function DeviceRegistration() {
 
   const [selectedLocationName, setSelectedLocationName] =
     useState("Select Location");
-  const [selectedDeviceCode, setSelectedDeviceCode] =
-    useState("Select Screen");
-  const [selectedDevice, setSelectedDevice] = useState<DeviceRecord | null>(null);
+  const [selectedDeviceCode, setSelectedDeviceCode] = useState("Select Screen");
+  const [selectedDevice, setSelectedDevice] = useState<DeviceRecord | null>(
+    null,
+  );
   const [landmark, setLandmark] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
   const [locationSearch, setLocationSearch] = useState("");
   const [deviceSearch, setDeviceSearch] = useState("");
-  const [openDropdown, setOpenDropdown] = useState<"location" | "device" | null>(
-    null,
-  );
+  const [openDropdown, setOpenDropdown] = useState<
+    "location" | "device" | null
+  >(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showRegisteredDeviceModal, setShowRegisteredDeviceModal] =
+    useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [storedDevice, setStoredDevice] =
+    useState<StoredRegisteredDevice | null>(null);
 
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const userMenuRef = useRef<HTMLButtonElement | null>(null);
@@ -478,8 +533,12 @@ export default function DeviceRegistration() {
   const filters = useMemo(() => ({}), []);
   const page = 1;
   const pageSize = 100;
-  const selectedStatFilter = "all" as const;
+  const selectedStatFilter = "unRegistered" as const;
   const sortState = null;
+  const isKioskSession = useMemo(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    return searchParams.get("kiosk") === "true";
+  }, []);
 
   const filteredLocations = useMemo(() => {
     const query = locationSearch.trim().toLowerCase();
@@ -496,6 +555,32 @@ export default function DeviceRegistration() {
   }, [deviceList, deviceSearch]);
 
   useEffect(() => {
+    let active = true;
+
+    void loadStoredRegisteredDevice()
+      .then((savedDevice) => {
+        if (!active || !savedDevice) {
+          return;
+        }
+
+        setStoredDevice(savedDevice);
+
+        if (isKioskSession) {
+          setShowRegisteredDeviceModal(true);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setStoredDevice(null);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [isKioskSession]);
+
+  useEffect(() => {
     if (!locationListLoaded) {
       void dispatch(fetchLocations());
     }
@@ -503,7 +588,6 @@ export default function DeviceRegistration() {
 
   useEffect(() => {
     if (successMessage) {
-      toast.success(successMessage, "Device");
       dispatch(clearDeviceMessages());
     }
   }, [dispatch, successMessage, toast]);
@@ -634,9 +718,30 @@ export default function DeviceRegistration() {
     setStatusMessage("");
   };
 
+  const applyStoredDeviceToForm = (device: StoredRegisteredDevice) => {
+    dispatch(setSelectedLocationId(String(device.locationId)));
+    setSelectedLocationName(device.locationName || "Select Location");
+    setSelectedDeviceCode(device.deviceCode || "Select Screen");
+    setSelectedDevice(toStoredDeviceRecord(device));
+    setLandmark(device.landmark || "");
+    setStatusMessage("");
+    setDeviceSearch("");
+    setLocationSearch("");
+    setOpenDropdown(null);
+  };
+
   const closeSuccessModal = () => {
     setShowSuccessModal(false);
+    // resetForm();
+    navigateToPlayer();
+  };
+
+  const handleReregisterDevice = () => {
     resetForm();
+    // if (storedDevice) {
+    //   applyStoredDeviceToForm(storedDevice);
+    // }
+    setShowRegisteredDeviceModal(false);
   };
 
   const handleSubmit = async () => {
@@ -670,24 +775,29 @@ export default function DeviceRegistration() {
       return;
     }
 
+    const nextStoredDevice: StoredRegisteredDevice = {
+      deviceCode,
+      locationId: Number(selectedLocationId),
+      locationName: selectedLocationName,
+      landmark: landmark.trim(),
+      brand: selectedDevice?.brand || storedDevice?.brand || undefined,
+      orientation:
+        selectedDevice?.orientation || storedDevice?.orientation || undefined,
+      deviceSize:
+        selectedDevice?.deviceSize || storedDevice?.deviceSize || undefined,
+    };
+
+    await saveRegisteredDevice(nextStoredDevice);
+    setStoredDevice(nextStoredDevice);
+
     setShowSuccessModal(true);
     setLandmark("");
     setSelectedDevice(null);
     setSelectedDeviceCode("Select Screen");
+  };
 
-    await dispatch(
-      fetchDevices(
-        buildDeviceListRequest({
-          filters,
-          locationList,
-          pageNumber: page,
-          pageSize,
-          selectedLocationId,
-          selectedStatFilter,
-          sortState,
-        }),
-      ),
-    );
+  const navigateToPlayer = () => {
+    navigate("/device/player");
   };
 
   const handleLogout = () => {
@@ -738,7 +848,9 @@ export default function DeviceRegistration() {
                 <div className="user-role">{userDetails.displayRole}</div>
               </div>
 
-              <ChevronDown className={`user-arrow${showUserMenu ? " open" : ""}`} />
+              <ChevronDown
+                className={`user-arrow${showUserMenu ? " open" : ""}`}
+              />
 
               {showUserMenu ? (
                 <div className="user-menu">
@@ -812,7 +924,9 @@ export default function DeviceRegistration() {
                                     key={String(location.locationId)}
                                     type="button"
                                     className="dropdown-item"
-                                    onClick={() => handleLocationSelect(location)}
+                                    onClick={() =>
+                                      handleLocationSelect(location)
+                                    }
                                   >
                                     {location.locationName}
                                   </button>
@@ -907,7 +1021,9 @@ export default function DeviceRegistration() {
                         </div>
 
                         <div className="device-tags">
-                          <div className="tag">{selectedDevice.brand || "-"}</div>
+                          <div className="tag">
+                            {selectedDevice.brand || "-"}
+                          </div>
                           <div className="tag">
                             {selectedDevice.deviceSize
                               ? `${selectedDevice.deviceSize} inch`
@@ -942,7 +1058,11 @@ export default function DeviceRegistration() {
                 </div>
 
                 <div className="buttons">
-                  <button className="btn cancel" type="button" onClick={resetForm}>
+                  <button
+                    className="btn cancel"
+                    type="button"
+                    onClick={resetForm}
+                  >
                     Cancel
                   </button>
                   <button
@@ -961,7 +1081,7 @@ export default function DeviceRegistration() {
       </div>
 
       {showSuccessModal ? (
-        <div className="modal" onClick={closeSuccessModal}>
+        <div className="modal">
           <div
             className="modal-content"
             role="dialog"
@@ -984,6 +1104,70 @@ export default function DeviceRegistration() {
             >
               Start Content Play
             </button>
+          </div>
+        </div>
+      ) : null}
+
+      {showRegisteredDeviceModal && storedDevice ? (
+        <div className="modal">
+          <div
+            className="modal-content"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="registeredDeviceTitle"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h3 id="registeredDeviceTitle">Device Already Registered</h3>
+            <p>
+              This kiosk already has a registered device. Review the saved
+              details below or re-register it with updated information.
+            </p>
+            <div className="device-summary">
+              <div className="device-summary-row">
+                <span>Location</span>
+                <strong>{storedDevice.locationName}</strong>
+              </div>
+              <div className="device-summary-row">
+                <span>Screen</span>
+                <strong>{storedDevice.deviceCode}</strong>
+              </div>
+              <div className="device-summary-row">
+                <span>Landmark</span>
+                <strong>{storedDevice.landmark || "-"}</strong>
+              </div>
+              <div className="device-summary-row">
+                <span>Brand</span>
+                <strong>{storedDevice.brand || "-"}</strong>
+              </div>
+              <div className="device-summary-row">
+                <span>Orientation</span>
+                <strong>{storedDevice.orientation || "-"}</strong>
+              </div>
+              <div className="device-summary-row">
+                <span>Size</span>
+                <strong>
+                  {storedDevice.deviceSize
+                    ? `${storedDevice.deviceSize} inch`
+                    : "-"}
+                </strong>
+              </div>
+            </div>
+            <div className="modal-actions">
+              <button
+                className="btn register"
+                type="button"
+                onClick={navigateToPlayer}
+              >
+                Directly Start Content Play
+              </button>
+              <button
+                className="btn cancel"
+                type="button"
+                onClick={handleReregisterDevice}
+              >
+                Reregister Device
+              </button>
+            </div>
           </div>
         </div>
       ) : null}

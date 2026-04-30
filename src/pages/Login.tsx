@@ -43,7 +43,7 @@ export default function Login() {
 
     if (isKiosk) {
       const encodedUser = encodeURIComponent(JSON.stringify(user));
-      window.location.href = `http://localhost:8086/device/view?kiosk=true&user=${encodedUser}`;
+      window.location.href = `/device/view?kiosk=true&user=${encodedUser}`;
       return;
     }
 
