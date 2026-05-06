@@ -1,10 +1,15 @@
 import type {
   CampaignMediaState,
   CampaignWizardState,
+  MediaMode,
   LocationOption,
   ScheduleEntry,
 } from "./adCampaignWizardTypes";
 import type { Ad } from "@/types";
+import {
+  createEmptyMediaSlot,
+  formatBytesFromSize,
+} from "./adCampaignWizardHelpers";
 
 function createDevices(prefix: string, deviceNames: string[]) {
   return deviceNames.map((name, index) => ({
@@ -14,7 +19,7 @@ function createDevices(prefix: string, deviceNames: string[]) {
 }
 
 export const WIZARD_STEPS = [
-  { id: 1, label: "Campaign Media" },
+  { id: 1, label: "Upload Media" },
   { id: 2, label: "Location & Screens" },
   { id: 3, label: "Schedule & Target Plays" },
   { id: 4, label: "Submit" },
@@ -95,12 +100,10 @@ export const DEFAULT_TIME_SLOTS = [
 ];
 
 export const DEFAULT_MEDIA_STATE: CampaignMediaState = {
+  contentId: null,
   name: "",
-  mediaFile: null,
-  previewUrl: "",
-  fileName: "",
-  durationSeconds: 30,
-  sizeLabel: "",
+  mediaMode: "AUTO_FIT",
+  uploadedMedia: [createEmptyMediaSlot("primary")],
 };
 
 export function createDefaultSchedule(): ScheduleEntry {
@@ -158,12 +161,18 @@ export function createInitialWizardState(
     isEditMode: Boolean(initialAd),
     campaign: initialAd
       ? {
+          contentId: initialAd.contentId,
           name: initialAd.contentName,
-          mediaFile: null,
-          previewUrl: "",
-          fileName: "Ad01_kingfisher.mp4",
-          durationSeconds: 30,
-          sizeLabel: "2.4 mb",
+          mediaMode: "AUTO_FIT",
+          uploadedMedia: [
+            {
+              ...createEmptyMediaSlot("primary"),
+              fileName: "Ad01_kingfisher.mp4",
+              sizeLabel: "2.4 mb",
+              durationSeconds: 30,
+              status: "uploaded",
+            },
+          ],
         }
       : DEFAULT_MEDIA_STATE,
     locations: {
@@ -172,4 +181,37 @@ export function createInitialWizardState(
     schedule,
     published: false,
   };
+}
+
+export function createMediaSlots(mode: MediaMode) {
+  if (mode === "CUSTOM") {
+    return [
+      createEmptyMediaSlot("primary"),
+      createEmptyMediaSlot("secondary", "Upload Landscape Ad"),
+    ];
+  }
+
+  return [createEmptyMediaSlot("primary", "Upload Media")];
+}
+
+export function mapDraftMediaToSlots(
+  media: Array<{
+    fileName: string;
+    filePath: string;
+    fileSize: number;
+    duration: number;
+  }>,
+  buildPreviewUrl: (filePath: string) => string,
+) {
+  return media.map((item, index) => ({
+    ...(index === 0
+      ? createEmptyMediaSlot("primary", media.length > 1 ? "Upload Portrait Ad" : "Upload Media")
+      : createEmptyMediaSlot("secondary", "Upload Landscape Ad")),
+    previewUrl: buildPreviewUrl(item.filePath),
+    fileName: item.fileName,
+    sizeLabel: formatBytesFromSize(item.fileSize),
+    durationSeconds: item.duration,
+    status: "uploaded" as const,
+    remoteFilePath: item.filePath,
+  }));
 }

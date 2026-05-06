@@ -1,3 +1,5 @@
+export * from "./user";
+
 export enum UserRole {
   SUPER_ADMIN = "super_admin",
   AD_MANAGER = "ad_manager",
@@ -59,6 +61,7 @@ export interface UserProfile {
   };
   modules?: UserModule[];
   [key: string]: unknown;
+  permissions: Permission[];
 }
 
 export interface SidebarMenuItem {
@@ -103,6 +106,7 @@ export interface DeviceRecord {
   deleted?: boolean;
   locations?: DeviceLocation;
   locationName?: string;
+  device?: string;
 }
 
 export interface DevicePayload {
@@ -165,57 +169,6 @@ export interface Ad {
   updatedAt?: string | null;
   updatedBy?: string | null;
   deleted?: boolean;
-}
-
-export interface ManagedUserRecord {
-  id: string | number;
-  empId: string;
-  employeeName: string;
-  emailId: string;
-  mobileNumber: string;
-  password?: string | null;
-  locationAccess?: string[] | null;
-  moduleAccess?: string[] | null;
-  accessAssignments?: UserAccessAssignment[] | null;
-  lastLoggedIn?: string | null;
-  createdOn?: string | null;
-  createdBy?: string | null;
-  status: string;
-  updatedAt?: string | null;
-  updatedBy?: string | null;
-}
-
-export interface UserAccessAssignment {
-  moduleId: string;
-  moduleName: string;
-  locationIds: string[];
-  locationNames: string[];
-}
-
-export interface UserLocationOption {
-  id: string;
-  name: string;
-}
-
-export interface UserModuleOption {
-  id: string;
-  name: string;
-}
-
-export interface ManagedUserFormPayload {
-  empId: string;
-  employeeName: string;
-  emailId: string;
-  mobileNumber: string;
-  password: string;
-  accessAssignments: UserAccessAssignment[];
-  userName: string;
-}
-
-export interface ManagedUserStatusSummary {
-  totalUsers: number;
-  activeUsers: number;
-  inactiveUsers: number;
 }
 
 export interface ApiEnvelope<TData> {

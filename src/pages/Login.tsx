@@ -125,7 +125,7 @@ export default function Login() {
 
             <div className="mt-8 space-y-5">
               <div className="relative">
-                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                <label className="mb-2 block text-sm font-semibold text-[#333333]">
                   Email
                 </label>
                 <input
@@ -140,7 +140,7 @@ export default function Login() {
               </div>
 
               <div className="relative">
-                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                <label className="mb-2 block text-sm font-semibold text-[#333333]">
                   Password
                 </label>
                 <input
@@ -154,7 +154,7 @@ export default function Login() {
                 />
                 <button
                   type="button"
-                  className="absolute right-3 top-[34px] rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                  className="absolute right-3 top-[34px] rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-[#333333]"
                   onClick={handlePasswordToggle}
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >

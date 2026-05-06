@@ -1,21 +1,25 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
+import {
+  createUserRecord,
+  fetchUserById as fetchUserByIdRequest,
+  fetchUserModules as fetchUserModulesRequest,
+  fetchUserRoles as fetchUserRolesRequest,
+  fetchUsersList,
+  requestUserPasswordReset,
+  updateUserRecord,
+  updateUserStatusRecord,
+} from "@/api/userManagementService";
+import { parseApiError } from "@/utils/errorHandler";
+import type { AsyncStatus } from "@/types";
 import type {
-  AsyncStatus,
   ManagedUserFormPayload,
   ManagedUserRecord,
   ManagedUserStatusSummary,
-  UserAccessAssignment,
-} from "@/types";
-import {
-  createManagedUserRecord,
-  getManagedUserById,
-  listManagedUsers,
-  updateManagedUser,
-  updateManagedUserAccess,
-  updateManagedUserPassword,
-  updateManagedUserStatus,
-} from "@/pages/UserManagement/userManagementData";
+  UserModuleFilter,
+  UserModuleOption,
+  UserRoleOption,
+} from "@/types/user";
 import type {
   UserListRequest,
   UserStatFilter,
@@ -25,33 +29,38 @@ interface UserFilters {
   [key: string]: string;
 }
 
+interface FetchUsersResult {
+  content: ManagedUserRecord[];
+  currentPage: number;
+  totalPages: number;
+  totalItems: number;
+  pageSize: number;
+  summary: ManagedUserStatusSummary;
+}
+
 interface UserState {
   items: ManagedUserRecord[];
   currentUser: ManagedUserRecord | null;
+  availableModules: UserModuleOption[];
+  availableRoles: UserRoleOption[];
   loading: boolean;
+  modulesLoading: boolean;
+  rolesLoading: boolean;
+  passwordResetLoading: boolean;
   error: string | null;
   successMessage: string | null;
+  passwordResetMessage: string | null;
   status: AsyncStatus;
   filters: UserFilters;
   listLoaded: boolean;
   currentPage: number;
   totalPages: number;
-  totalElements: number;
+  totalItems: number;
   pageSize: number;
-  selectedModule: string;
+  sorting: UserListRequest["sortCriteria"];
+  selectedModules: UserModuleFilter[];
   selectedStatFilter: UserStatFilter;
   summary: ManagedUserStatusSummary;
-}
-
-interface PaginatedUsers {
-  summary: ManagedUserStatusSummary;
-  content: ManagedUserRecord[];
-  currentPage: number;
-  totalPages: number;
-  totalElements: number;
-  pageSize: number;
-  isFirst: boolean;
-  isLast: boolean;
 }
 
 interface UpdateUserPayload extends ManagedUserFormPayload {
@@ -61,74 +70,63 @@ interface UpdateUserPayload extends ManagedUserFormPayload {
 interface UpdateUserStatusRequest {
   id: string | number;
   status: "Active" | "Inactive";
-  userName: string;
 }
 
-interface UpdateUserPasswordRequest {
-  id: string | number;
-  password: string;
-  userName: string;
-}
-
-interface UpdateUserAccessRequest {
-  id: string | number;
-  accessAssignments: UserAccessAssignment[];
-  userName: string;
-}
+const initialSummary: ManagedUserStatusSummary = {
+  totalUsers: 0,
+  activeUsers: 0,
+  inactiveUsers: 0,
+};
 
 const initialState: UserState = {
   items: [],
   currentUser: null,
+  availableModules: [],
+  availableRoles: [],
   loading: false,
+  modulesLoading: false,
+  rolesLoading: false,
+  passwordResetLoading: false,
   error: null,
   successMessage: null,
+  passwordResetMessage: null,
   status: "idle",
   filters: {},
   listLoaded: false,
   currentPage: 1,
   totalPages: 1,
-  totalElements: 0,
+  totalItems: 0,
   pageSize: 10,
-  selectedModule: "all",
+  sorting: [],
+  selectedModules: [],
   selectedStatFilter: "all",
-  summary: {
-    totalUsers: 0,
-    activeUsers: 0,
-    inactiveUsers: 0,
-  },
+  summary: initialSummary,
 };
 
 export const fetchUsers = createAsyncThunk<
-  PaginatedUsers,
+  FetchUsersResult,
   UserListRequest | void,
   { rejectValue: string }
 >("users/fetchUsers", async (payload, { rejectWithValue }) => {
   try {
-    return listManagedUsers({
+    return await fetchUsersList({
       page: payload?.page ?? 0,
       size: payload?.size ?? 10,
       ...(payload?.empId ? { empId: payload.empId } : {}),
       ...(payload?.employeeName ? { employeeName: payload.employeeName } : {}),
       ...(payload?.emailId ? { emailId: payload.emailId } : {}),
       ...(payload?.mobileNumber ? { mobileNumber: payload.mobileNumber } : {}),
-      ...(payload?.password ? { password: payload.password } : {}),
-      ...(payload?.locationAccess
-        ? { locationAccess: payload.locationAccess }
-        : {}),
-      ...(payload?.moduleAccess ? { moduleAccess: payload.moduleAccess } : {}),
       ...(payload?.lastLoggedIn ? { lastLoggedIn: payload.lastLoggedIn } : {}),
       ...(payload?.createdOn ? { createdOn: payload.createdOn } : {}),
       ...(payload?.createdBy ? { createdBy: payload.createdBy } : {}),
       ...(payload?.status ? { status: payload.status } : {}),
-      ...(payload?.module ? { module: payload.module } : {}),
+      ...(payload?.moduleIds?.length ? { moduleIds: payload.moduleIds } : {}),
       ...(payload?.sortCriteria?.length
         ? { sortCriteria: payload.sortCriteria }
         : {}),
     });
   } catch (error) {
-    return rejectWithValue(
-      error instanceof Error ? error.message : "Unable to fetch users.",
-    );
+    return rejectWithValue(parseApiError(error, "Unable to fetch users."));
   }
 });
 
@@ -137,13 +135,35 @@ export const fetchUserById = createAsyncThunk<
   { id: string | number },
   { rejectValue: string }
 >("users/fetchUserById", async ({ id }, { rejectWithValue }) => {
-  const user = getManagedUserById(id);
-
-  if (!user) {
-    return rejectWithValue("Unable to fetch user.");
+  try {
+    return await fetchUserByIdRequest(id);
+  } catch (error) {
+    return rejectWithValue(parseApiError(error, "Unable to fetch user."));
   }
+});
 
-  return user;
+export const fetchUserModules = createAsyncThunk<
+  UserModuleOption[],
+  void,
+  { rejectValue: string }
+>("users/fetchModules", async (_, { rejectWithValue }) => {
+  try {
+    return await fetchUserModulesRequest();
+  } catch (error) {
+    return rejectWithValue(parseApiError(error, "Unable to fetch modules."));
+  }
+});
+
+export const fetchUserRoles = createAsyncThunk<
+  UserRoleOption[],
+  void,
+  { rejectValue: string }
+>("users/fetchRoles", async (_, { rejectWithValue }) => {
+  try {
+    return await fetchUserRolesRequest();
+  } catch (error) {
+    return rejectWithValue(parseApiError(error, "Unable to fetch roles."));
+  }
 });
 
 export const createUser = createAsyncThunk<
@@ -152,11 +172,9 @@ export const createUser = createAsyncThunk<
   { rejectValue: string }
 >("users/createUser", async (payload, { rejectWithValue }) => {
   try {
-    return createManagedUserRecord(payload);
+    return await createUserRecord(payload);
   } catch (error) {
-    return rejectWithValue(
-      error instanceof Error ? error.message : "Unable to create user.",
-    );
+    return rejectWithValue(parseApiError(error, "Unable to create user."));
   }
 });
 
@@ -166,66 +184,44 @@ export const updateUser = createAsyncThunk<
   { rejectValue: string }
 >("users/updateUser", async (payload, { rejectWithValue }) => {
   try {
-    return updateManagedUser(payload);
+    return await updateUserRecord(payload);
   } catch (error) {
-    return rejectWithValue(
-      error instanceof Error ? error.message : "Unable to update user.",
-    );
+    return rejectWithValue(parseApiError(error, "Unable to update user."));
   }
 });
 
 export const updateUserStatus = createAsyncThunk<
-  { message: string },
+  { id: string | number; status: "Active" | "Inactive"; message: string },
   UpdateUserStatusRequest,
   { rejectValue: string }
 >("users/updateStatus", async (payload, { rejectWithValue }) => {
   try {
-    updateManagedUserStatus(payload);
+    const message = await updateUserStatusRecord(payload);
 
     return {
-      message: `User marked ${payload.status.toLowerCase()}.`,
+      ...payload,
+      message,
     };
   } catch (error) {
     return rejectWithValue(
-      error instanceof Error
-        ? error.message
-        : `Unable to mark user ${payload.status.toLowerCase()}.`,
+      parseApiError(
+        error,
+        `Unable to mark user ${payload.status.toLowerCase()}.`,
+      ),
     );
   }
 });
 
-export const updateUserPassword = createAsyncThunk<
-  { message: string },
-  UpdateUserPasswordRequest,
+export const resetUserPassword = createAsyncThunk<
+  string,
+  { id: string | number },
   { rejectValue: string }
->("users/updatePassword", async (payload, { rejectWithValue }) => {
+>("users/resetPassword", async ({ id }, { rejectWithValue }) => {
   try {
-    updateManagedUserPassword(payload);
-
-    return {
-      message: "Password changed successfully.",
-    };
+    return await requestUserPasswordReset(id);
   } catch (error) {
     return rejectWithValue(
-      error instanceof Error ? error.message : "Unable to change password.",
-    );
-  }
-});
-
-export const updateUserAccess = createAsyncThunk<
-  { message: string },
-  UpdateUserAccessRequest,
-  { rejectValue: string }
->("users/updateAccess", async (payload, { rejectWithValue }) => {
-  try {
-    updateManagedUserAccess(payload);
-
-    return {
-      message: "Access updated successfully.",
-    };
-  } catch (error) {
-    return rejectWithValue(
-      error instanceof Error ? error.message : "Unable to update access.",
+      parseApiError(error, "Unable to send reset password link."),
     );
   }
 });
@@ -248,7 +244,7 @@ function upsertUser(
   return nextUsers;
 }
 
-const userSlice = createSlice({
+const usersSlice = createSlice({
   name: "users",
   initialState,
   reducers: {
@@ -261,15 +257,22 @@ const userSlice = createSlice({
     clearUserMessages(state) {
       state.error = null;
       state.successMessage = null;
+      state.passwordResetMessage = null;
     },
     clearUserFilters(state) {
       state.filters = {};
     },
-    setSelectedModule(state, action: PayloadAction<string>) {
-      state.selectedModule = action.payload;
+    setSelectedModules(state, action: PayloadAction<UserModuleFilter[]>) {
+      state.selectedModules = action.payload;
     },
     setSelectedUserStatFilter(state, action: PayloadAction<UserStatFilter>) {
       state.selectedStatFilter = action.payload;
+    },
+    setUserSorting(
+      state,
+      action: PayloadAction<UserListRequest["sortCriteria"]>,
+    ) {
+      state.sorting = action.payload;
     },
     clearCurrentUser(state) {
       state.currentUser = null;
@@ -300,7 +303,7 @@ const userSlice = createSlice({
         state.summary = action.payload.summary;
         state.currentPage = action.payload.currentPage + 1;
         state.totalPages = action.payload.totalPages;
-        state.totalElements = action.payload.totalElements;
+        state.totalItems = action.payload.totalItems;
         state.pageSize = action.payload.pageSize;
         state.status = "succeeded";
         state.listLoaded = true;
@@ -316,6 +319,33 @@ const userSlice = createSlice({
         state.status = "succeeded";
       })
       .addCase(fetchUserById.rejected, rejected)
+      .addCase(fetchUserModules.pending, (state) => {
+        state.modulesLoading = true;
+        state.error = null;
+      })
+      .addCase(fetchUserModules.fulfilled, (state, action) => {
+        state.modulesLoading = false;
+        state.availableModules = action.payload.filter(
+          (moduleOption) =>
+            moduleOption.name.trim().toLowerCase() !== "user management",
+        );
+      })
+      .addCase(fetchUserModules.rejected, (state, action) => {
+        state.modulesLoading = false;
+        state.error = action.payload ?? "Unable to fetch modules.";
+      })
+      .addCase(fetchUserRoles.pending, (state) => {
+        state.rolesLoading = true;
+        state.error = null;
+      })
+      .addCase(fetchUserRoles.fulfilled, (state, action) => {
+        state.rolesLoading = false;
+        state.availableRoles = action.payload;
+      })
+      .addCase(fetchUserRoles.rejected, (state, action) => {
+        state.rolesLoading = false;
+        state.error = action.payload ?? "Unable to fetch roles.";
+      })
       .addCase(createUser.pending, pending)
       .addCase(createUser.fulfilled, (state, action) => {
         state.loading = false;
@@ -337,24 +367,30 @@ const userSlice = createSlice({
       .addCase(updateUserStatus.pending, pending)
       .addCase(updateUserStatus.fulfilled, (state, action) => {
         state.loading = false;
+        state.items = state.items.map((user) =>
+          String(user.id) === String(action.payload.id)
+            ? {
+                ...user,
+                status: action.payload.status,
+              }
+            : user,
+        );
         state.successMessage = action.payload.message;
         state.status = "succeeded";
       })
       .addCase(updateUserStatus.rejected, rejected)
-      .addCase(updateUserPassword.pending, pending)
-      .addCase(updateUserPassword.fulfilled, (state, action) => {
-        state.loading = false;
-        state.successMessage = action.payload.message;
-        state.status = "succeeded";
+      .addCase(resetUserPassword.pending, (state) => {
+        state.passwordResetLoading = true;
+        state.error = null;
       })
-      .addCase(updateUserPassword.rejected, rejected)
-      .addCase(updateUserAccess.pending, pending)
-      .addCase(updateUserAccess.fulfilled, (state, action) => {
-        state.loading = false;
-        state.successMessage = action.payload.message;
-        state.status = "succeeded";
+      .addCase(resetUserPassword.fulfilled, (state, action) => {
+        state.passwordResetLoading = false;
+        state.passwordResetMessage = action.payload;
       })
-      .addCase(updateUserAccess.rejected, rejected);
+      .addCase(resetUserPassword.rejected, (state, action) => {
+        state.passwordResetLoading = false;
+        state.error = action.payload ?? "Unable to send reset password link.";
+      });
   },
 });
 
@@ -362,8 +398,9 @@ export const {
   setUserFilter,
   clearUserMessages,
   clearUserFilters,
-  setSelectedModule,
+  setSelectedModules,
   setSelectedUserStatFilter,
+  setUserSorting,
   clearCurrentUser,
-} = userSlice.actions;
-export default userSlice.reducer;
+} = usersSlice.actions;
+export default usersSlice.reducer;

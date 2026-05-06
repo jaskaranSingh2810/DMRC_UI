@@ -12,18 +12,33 @@ import {
   FileText,
   MapPin,
   Monitor,
-  Upload,
+  MoveRight,
 } from "lucide-react";
+import { useToast } from "@/hooks/useToast";
+import AdCampaignStepOne from "./AdCampaignStepOne";
 import {
   createDefaultSchedule,
+  createMediaSlots,
   createInitialWizardState,
-  DEFAULT_MEDIA_STATE,
   LOCATION_OPTIONS,
+  mapDraftMediaToSlots,
   WIZARD_STEPS,
 } from "./adCampaignWizardData";
+import {
+  createEmptyMediaSlot,
+  buildMediaPreviewUrl,
+  formatBytes,
+  getStepOneValidationMessage,
+  getUploadedMedia,
+  isStepOneReady,
+} from "./adCampaignWizardHelpers";
+import { useAppDispatch } from "@/store/hooks";
+import { fetchAdContent, saveAdDraft } from "@/store/slices/adSlice";
 import type {
   AdCampaignWizardProps,
   CampaignWizardState,
+  DraftContentResponse,
+  MediaMode,
   ScheduleEntry,
   WizardStep,
 } from "./adCampaignWizardTypes";
@@ -31,16 +46,21 @@ import type {
 type WizardAction =
   | { type: "SET_STEP"; payload: WizardStep }
   | { type: "SET_CAMPAIGN_NAME"; payload: string }
+  | { type: "SET_MEDIA_MODE"; payload: MediaMode }
   | {
-      type: "SET_MEDIA";
+      type: "SET_MEDIA_SLOT";
       payload: {
+        slotId: string;
         file: File | null;
         previewUrl: string;
         fileName: string;
         sizeLabel: string;
+        durationSeconds: number;
       };
     }
-  | { type: "REMOVE_MEDIA" }
+  | { type: "REMOVE_MEDIA_SLOT"; payload: { slotId: string } }
+  | { type: "SET_CONTENT_ID"; payload: string | number | null }
+  | { type: "HYDRATE_DRAFT"; payload: DraftContentResponse }
   | { type: "TOGGLE_LOCATION"; payload: string }
   | { type: "TOGGLE_DEVICE"; payload: { locationId: string; deviceId: string } }
   | { type: "TOGGLE_SELECT_ALL_DEVICES"; payload: { locationId: string } }
@@ -54,11 +74,6 @@ type WizardAction =
     }
   | { type: "SYNC_SCHEDULE" }
   | { type: "PUBLISH" };
-
-function formatBytes(file: File): string {
-  const mb = file.size / (1024 * 1024);
-  return `${mb.toFixed(1)} mb`;
-}
 
 function wizardReducer(
   state: CampaignWizardState,
@@ -78,26 +93,88 @@ function wizardReducer(
           name: action.payload,
         },
       };
-    case "SET_MEDIA":
+    case "SET_MEDIA_MODE": {
+      const existingMedia = state.campaign.uploadedMedia.filter(
+        (media) => media.status === "uploaded",
+      );
+      const nextSlots = createMediaSlots(action.payload).map((slot, index) => {
+        const existingSlot = existingMedia[index];
+        return existingSlot
+          ? {
+              ...slot,
+              ...existingSlot,
+              id: slot.id,
+              label: slot.label,
+            }
+          : slot;
+      });
+
       return {
         ...state,
         campaign: {
           ...state.campaign,
-          mediaFile: action.payload.file,
-          previewUrl: action.payload.previewUrl,
-          fileName: action.payload.fileName,
-          sizeLabel: action.payload.sizeLabel,
-          durationSeconds: 30,
+          mediaMode: action.payload,
+          uploadedMedia: nextSlots,
         },
       };
-    case "REMOVE_MEDIA":
+    }
+    case "SET_MEDIA_SLOT":
       return {
         ...state,
         campaign: {
-          ...DEFAULT_MEDIA_STATE,
-          name: state.campaign.name,
+          ...state.campaign,
+          uploadedMedia: state.campaign.uploadedMedia.map((media) =>
+            media.id === action.payload.slotId
+              ? {
+                  ...media,
+                  file: action.payload.file,
+                  previewUrl: action.payload.previewUrl,
+                  fileName: action.payload.fileName,
+                  sizeLabel: action.payload.sizeLabel,
+                  durationSeconds: action.payload.durationSeconds,
+                  status: action.payload.file ? "uploaded" : "empty",
+                  remoteFilePath: null,
+                }
+              : media,
+          ),
         },
       };
+    case "REMOVE_MEDIA_SLOT":
+      return {
+        ...state,
+        campaign: {
+          ...state.campaign,
+          uploadedMedia: state.campaign.uploadedMedia.map((media) =>
+            media.id === action.payload.slotId
+              ? createEmptyMediaSlot(media.id, media.label)
+              : media,
+          ),
+        },
+      };
+    case "SET_CONTENT_ID":
+      return {
+        ...state,
+        campaign: {
+          ...state.campaign,
+          contentId: action.payload,
+        },
+      };
+    case "HYDRATE_DRAFT": {
+      const mediaMode: MediaMode =
+        action.payload.media.length > 1 ? "CUSTOM" : "AUTO_FIT";
+      return {
+        ...state,
+        campaign: {
+          contentId: action.payload.contentId,
+          name: action.payload.contentName,
+          mediaMode,
+          uploadedMedia:
+            action.payload.media.length > 0
+              ? mapDraftMediaToSlots(action.payload.media, buildMediaPreviewUrl)
+              : createMediaSlots(mediaMode),
+        },
+      };
+    }
     case "TOGGLE_LOCATION": {
       const locationId = action.payload;
       const nextSelectedDevices = { ...state.locations.selectedDevices };
@@ -207,7 +284,7 @@ function wizardReducer(
 }
 
 function isStepOneValid(state: CampaignWizardState) {
-  return Boolean(state.campaign.name.trim() && state.campaign.fileName);
+  return isStepOneReady(state.campaign);
 }
 
 function isStepTwoValid(state: CampaignWizardState) {
@@ -261,11 +338,15 @@ function isStepValid(step: WizardStep, state: CampaignWizardState) {
 export default function AdCampaignWizard({
   initialAd,
 }: AdCampaignWizardProps) {
+  const appDispatch = useAppDispatch();
   const navigate = useNavigate();
+  const toast = useToast();
   const [state, dispatch] = useReducer(
     wizardReducer,
     createInitialWizardState(initialAd),
   );
+  const [draftSaving, setDraftSaving] = useState(false);
+  const [draftLoading, setDraftLoading] = useState(false);
   const [expandedLocationId, setExpandedLocationId] = useState<string | null>(
     Object.keys(state.locations.selectedDevices)[0] ?? null,
   );
@@ -292,11 +373,42 @@ export default function AdCampaignWizard({
 
   useEffect(() => {
     return () => {
-      if (state.campaign.previewUrl.startsWith("blob:")) {
-        URL.revokeObjectURL(state.campaign.previewUrl);
-      }
+      state.campaign.uploadedMedia.forEach((media) => {
+        if (media.previewUrl.startsWith("blob:")) {
+          URL.revokeObjectURL(media.previewUrl);
+        }
+      });
     };
-  }, [state.campaign.previewUrl]);
+  }, [state.campaign.uploadedMedia]);
+
+  useEffect(() => {
+    const contentId = initialAd?.contentId;
+
+    if (!contentId) {
+      return;
+    }
+
+    setDraftLoading(true);
+
+    void appDispatch(fetchAdContent(contentId))
+      .unwrap()
+      .then((draft) => {
+        dispatch({ type: "HYDRATE_DRAFT", payload: draft });
+      })
+      .catch((error) => {
+        toast.error(
+          typeof error === "string"
+            ? error
+            : error instanceof Error
+              ? error.message
+              : "Unable to load content.",
+          "Ad",
+        );
+      })
+      .finally(() => {
+        setDraftLoading(false);
+      });
+  }, [appDispatch, initialAd?.contentId, toast]);
 
   const selectedLocationIds = Object.keys(state.locations.selectedDevices);
   const selectedLocations = useMemo(
@@ -337,26 +449,97 @@ export default function AdCampaignWizard({
     );
   };
 
-  const handleMediaUpload = (event: ChangeEvent<HTMLInputElement>) => {
+  const handleMediaUpload = async (
+    slotId: string,
+    event: ChangeEvent<HTMLInputElement>,
+  ) => {
     const file = event.target.files?.[0];
 
     if (!file) {
       return;
     }
 
-    if (state.campaign.previewUrl.startsWith("blob:")) {
-      URL.revokeObjectURL(state.campaign.previewUrl);
+    const previousMedia = state.campaign.uploadedMedia.find(
+      (media) => media.id === slotId,
+    );
+
+    if (previousMedia?.previewUrl.startsWith("blob:")) {
+      URL.revokeObjectURL(previousMedia.previewUrl);
     }
 
+    const durationSeconds = await getVideoDuration(file);
+
     dispatch({
-      type: "SET_MEDIA",
+      type: "SET_MEDIA_SLOT",
       payload: {
+        slotId,
         file,
         previewUrl: URL.createObjectURL(file),
         fileName: file.name,
         sizeLabel: formatBytes(file),
+        durationSeconds,
       },
     });
+
+    event.target.value = "";
+  };
+
+  const handleMediaModeChange = (mediaMode: MediaMode) => {
+    if (mediaMode === state.campaign.mediaMode) {
+      return;
+    }
+
+    if (mediaMode === "AUTO_FIT") {
+      const secondaryMedia = state.campaign.uploadedMedia.slice(1);
+      secondaryMedia.forEach((media) => {
+        if (media.previewUrl.startsWith("blob:")) {
+          URL.revokeObjectURL(media.previewUrl);
+        }
+      });
+    }
+
+    dispatch({ type: "SET_MEDIA_MODE", payload: mediaMode });
+  };
+
+  const handleRemoveMedia = (slotId: string) => {
+    const existingMedia = state.campaign.uploadedMedia.find(
+      (media) => media.id === slotId,
+    );
+
+    if (existingMedia?.previewUrl.startsWith("blob:")) {
+      URL.revokeObjectURL(existingMedia.previewUrl);
+    }
+
+    dispatch({ type: "REMOVE_MEDIA_SLOT", payload: { slotId } });
+  };
+
+  const handleSaveDraft = async () => {
+    const validationMessage = getStepOneValidationMessage(state.campaign);
+
+    if (state.step === 1 && validationMessage) {
+      toast.error(validationMessage, "Ad");
+      return;
+    }
+
+    setDraftSaving(true);
+
+    try {
+      const draft = await appDispatch(saveAdDraft(state.campaign)).unwrap();
+      dispatch({ type: "HYDRATE_DRAFT", payload: draft });
+      dispatch({ type: "SET_CONTENT_ID", payload: draft.contentId });
+      toast.success("Content upload successfully", "Ad");
+    } catch (error) {
+      toast.error(
+        typeof error === "string"
+          ? error
+          : error instanceof Error
+            ? error.message
+            : "Unable to save draft.",
+        "Ad",
+      );
+    } finally {
+      setDraftSaving(false);
+    }
   };
 
   const goNext = () => {
@@ -395,10 +578,10 @@ export default function AdCampaignWizard({
             <div className="flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg shadow-emerald-200">
               <Check className="h-10 w-10" />
             </div>
-            <h2 className="mt-8 text-3xl font-semibold text-slate-900">
+            <h2 className="mt-8 text-3xl font-semibold text-[#333333]">
               Congratulations!
             </h2>
-            <p className="mt-3 max-w-xl text-sm text-slate-500">
+            <p className="mt-3 max-w-xl text-sm text-[#333333]">
               Your announcement has been successfully scheduled. It will be
               published automatically at the selected time.
             </p>
@@ -415,7 +598,7 @@ export default function AdCampaignWizard({
       totalSelectedDevices={totalSelectedDevices}
       onBack={goBack}
     >
-      <div className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+      <div className="rounded-[24px] shadow-sm">
         <StepIndicator
           currentStep={state.step}
           isEditMode={state.isEditMode}
@@ -428,15 +611,16 @@ export default function AdCampaignWizard({
         />
 
         <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="min-w-0 space-y-6">
+          <div className="min-w-0 space-y-6 rounded-[18px] border border-[#E8E1EE] bg-white p-4 shadow-sm sm:p-5">
             {state.step === 1 ? (
-              <Step1CampaignMedia
+              <AdCampaignStepOne
                 campaign={state.campaign}
                 onNameChange={(value) =>
                   dispatch({ type: "SET_CAMPAIGN_NAME", payload: value })
                 }
+                onMediaModeChange={handleMediaModeChange}
                 onMediaUpload={handleMediaUpload}
-                onRemoveMedia={() => dispatch({ type: "REMOVE_MEDIA" })}
+                onRemoveMedia={handleRemoveMedia}
               />
             ) : null}
 
@@ -488,12 +672,14 @@ export default function AdCampaignWizard({
               <WizardFooter
                 step={state.step}
                 canProceed={currentStepValid}
+                draftSaving={draftSaving}
+                draftDisabled={state.step === 1 && draftLoading}
                 onBack={goBack}
+                onSaveDraft={() => void handleSaveDraft()}
                 onNext={goNext}
               />
             ) : null}
           </div>
-
           <div className="order-last lg:order-none">
             <div className="lg:sticky lg:top-6">
               {state.step === 1 ? (
@@ -516,6 +702,7 @@ export default function AdCampaignWizard({
               )}
             </div>
           </div>
+
         </div>
       </div>
     </WizardShell>
@@ -537,10 +724,10 @@ function WizardShell({
 }) {
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
-        <span>Ad Management</span>
-        <ChevronRight className="h-4 w-4" />
-        <span className="font-semibold text-slate-900">Create New Ad</span>
+      <div className="flex flex-wrap items-center gap-2 text-sm text-[#333333]">
+        <span className="text-[24px] font-[400]">Ad Management</span>
+        <ChevronRight className="h-6 w-6" />
+        <span className="font-semibold text-[#333333] text-[24px]">Create New Ad</span>
         {state.isEditMode ? (
           <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-semibold text-violet-700">
             Edit mode
@@ -550,14 +737,14 @@ function WizardShell({
 
       {children}
 
-      {state.step === 4 && !state.published ? null : (
-        <div className="hidden rounded-[24px] border border-slate-200 bg-white px-6 py-4 text-sm text-slate-500 xl:flex xl:items-center xl:justify-between">
+      {/* {state.step === 4 && !state.published ? null : (
+        <div className="hidden rounded-[24px] border border-slate-200 bg-white px-6 py-4 text-sm text-[#333333] xl:flex xl:items-center xl:justify-between">
           <div>
-            <span className="font-semibold text-slate-900">
+            <span className="font-semibold text-[#333333]">
               {selectedLocations.length}
             </span>{" "}
             locations selected with{" "}
-            <span className="font-semibold text-slate-900">
+            <span className="font-semibold text-[#333333]">
               {totalSelectedDevices}
             </span>{" "}
             screens configured.
@@ -565,13 +752,13 @@ function WizardShell({
           <button
             type="button"
             onClick={onBack}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 font-medium text-slate-700 transition hover:bg-slate-50"
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 font-medium text-[#333333] transition hover:bg-slate-50"
           >
             <ArrowLeft className="h-4 w-4" />
             Back
           </button>
         </div>
-      )}
+      )} */}
     </div>
   );
 }
@@ -589,42 +776,42 @@ export function StepIndicator({
 }) {
   return (
     <div className="overflow-x-auto pb-2">
-      <div className="flex min-w-max items-center gap-2 md:gap-3">
+      <div className="flex min-w-max items-center gap-2 md:gap-3 justify-between">
         {WIZARD_STEPS.map((step, index) => {
           const isActive = currentStep === step.id;
           const isCompleted = currentStep > step.id;
           const isEnabled = isEditMode || canReachStep(step.id);
 
           return (
-            <div key={step.id} className="flex items-center gap-2 md:gap-3">
+            <div key={step.id} className="flex items-center gap-2 md:gap-3 w-full">
               <button
                 type="button"
                 onClick={() => onStepClick(step.id)}
                 disabled={!isEnabled}
-                className={`flex min-w-[220px] items-center gap-3 rounded-2xl border px-4 py-3 text-left transition ${
+                className={`flex min-w-[260px] w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left transition ${
                   isActive
-                    ? "border-violet-300 bg-violet-50 text-violet-800"
+                    ? "border-[#9870AD] bg-[#F2EAF6] text-[#5E1B7F]"
                     : isCompleted
-                      ? "border-violet-200 bg-white text-slate-700"
-                      : "border-slate-200 bg-white text-slate-500"
-                } ${isEnabled ? "cursor-pointer" : "cursor-not-allowed opacity-50"}`}
+                      ? "border-[#D1D5DC] bg-white text-[#333333]"
+                      : "border-[#D1D5DC] bg-white text-[#333333]"
+                } ${isEnabled ? "cursor-pointer" : "cursor-not-allowed"}`}
               >
                 <span
-                  className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold ${
+                  className={`flex h-7 w-7 items-center justify-center rounded-full text-[14px] font-medium ${
                     isActive
-                      ? "bg-violet-700 text-white"
+                      ? "bg-[#5E1B7F] text-white"
                       : isCompleted
-                        ? "bg-violet-100 text-violet-700"
-                        : "bg-slate-100 text-slate-500"
+                        ? "bg-[#F2EAF6] text-[#5E1B7F]"
+                        : "bg-[#E2E4EA] text-[#333333]"
                   }`}
                 >
                   {isCompleted ? <Check className="h-4 w-4" /> : step.id}
                 </span>
-                <span className="text-sm font-medium">{step.label}</span>
+                <span className="text-[14px] text-[#333333] font-medium lg:text-nowrap text-wrap">{step.label}</span>
               </button>
 
               {index < WIZARD_STEPS.length - 1 ? (
-                <ChevronRight className="hidden h-4 w-4 text-slate-300 md:block" />
+                <MoveRight className="h-8 w-full text-[#B8B8B8]" />
               ) : null}
             </div>
           );
@@ -639,19 +826,21 @@ export function CampaignMediaPreview({
 }: {
   campaign: CampaignWizardState["campaign"];
 }) {
+  const primaryMedia = getUploadedMedia(campaign)[0] ?? campaign.uploadedMedia[0];
+
   return (
     <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="flex items-center gap-2 text-xl font-semibold text-slate-900">
+      <div className="flex items-center gap-2 text-[18px] font-semibold text-[#333333]">
         <FileText className="h-5 w-5 text-violet-700" />
-        <h3>Campaign Media</h3>
+        <span>Campaign Media</span>
       </div>
 
       <div className="mt-4 rounded-2xl border border-slate-200 p-3">
         <div className="flex flex-col gap-4 sm:flex-row">
           <div className="h-24 w-full overflow-hidden rounded-xl bg-gradient-to-br from-[#7b1fa2] via-[#1a56db] to-[#0f172a] sm:w-36">
-            {campaign.previewUrl ? (
+            {primaryMedia?.previewUrl ? (
               <video
-                src={campaign.previewUrl}
+                src={primaryMedia.previewUrl}
                 className="h-full w-full object-cover"
                 muted
               />
@@ -663,21 +852,22 @@ export function CampaignMediaPreview({
           </div>
 
           <div className="min-w-0 flex-1">
-            <p className="truncate text-lg font-semibold text-slate-900">
+            <p className="truncate text-lg font-semibold text-[#333333]">
               {campaign.name || "Untitled campaign"}
             </p>
-            <p className="mt-1 truncate text-sm text-slate-500">
-              {campaign.fileName || "No media uploaded yet"}
+            <p className="mt-1 truncate text-sm text-[#333333]">
+              {getUploadedMedia(campaign).map((item) => item.fileName).join(", ") ||
+                "No media uploaded yet"}
             </p>
-            <div className="mt-3 flex flex-wrap gap-4 text-sm text-slate-500">
+            <div className="mt-3 flex flex-wrap gap-4 text-sm text-[#333333]">
               <span className="inline-flex items-center gap-1">
                 <Clock3 className="h-4 w-4" />
-                {campaign.durationSeconds} seconds
+                {primaryMedia?.durationSeconds ?? 0} seconds
               </span>
-              {campaign.sizeLabel ? (
+              {primaryMedia?.sizeLabel ? (
                 <span className="inline-flex items-center gap-1">
                   <FileText className="h-4 w-4" />
-                  {campaign.sizeLabel}
+                  {primaryMedia.sizeLabel}
                 </span>
               ) : null}
             </div>
@@ -701,17 +891,17 @@ export function InventoryForecastPanel({
 }) {
   if (!selectedLocations.length) {
     return (
-      <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="flex items-center gap-2 text-xl font-semibold text-slate-900">
+      <div className="rounded-[18px] border border-[#E8E1EE] bg-white p-5 shadow-sm">
+        <div className="flex items-center gap-2 text-base font-semibold text-[#333333]">
           <BarChart3 className="h-5 w-5 text-violet-700" />
           <h3>Inventory Forecast</h3>
         </div>
-        <div className="flex min-h-[260px] flex-col items-center justify-center text-center text-slate-500">
+        <div className="flex min-h-[260px] flex-col items-center justify-center text-center text-[#333333]">
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 text-slate-400">
             <BarChart3 className="h-8 w-8" />
           </div>
-          <p className="mt-5 max-w-xs text-base">
-            Select locations and configure schedule to view the forecast.
+          <p className="mt-5 max-w-xs text-sm leading-6">
+            Select locations &amp; configure Schedule to the forecast
           </p>
         </div>
       </div>
@@ -735,9 +925,9 @@ export function InventoryForecastPanel({
 
   return (
     <div className="space-y-4 rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="flex items-center gap-2 text-xl font-semibold text-slate-900">
+      <div className="flex items-center gap-2 text-[18px] font-semibold text-[#333333]">
         <BarChart3 className="h-5 w-5 text-violet-700" />
-        <h3>Inventory Forecast</h3>
+        <span className="text-[18px] font-semibold text-[#333333]">Inventory Forecast</span>
       </div>
 
       {selectedLocations.map((location) => {
@@ -804,13 +994,13 @@ export function InventoryForecastPanel({
       })}
 
       <div className="rounded-2xl border border-slate-200 p-4">
-        <p className="text-lg font-semibold text-slate-900">Campaign Summary</p>
+        <p className="text-lg font-semibold text-[#333333]">Campaign Summary</p>
         <div className="mt-4 flex items-center gap-4">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full border-4 border-slate-200 text-sm font-semibold text-slate-700">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full border-4 border-slate-200 text-sm font-semibold text-[#333333]">
             {utilisationPercentage}%
           </div>
-          <div className="text-sm text-slate-500">
-            <p className="font-semibold text-slate-900">Overall utilisation</p>
+          <div className="text-sm text-[#333333]">
+            <p className="font-semibold text-[#333333]">Overall utilisation</p>
             <p>
               {totalSelectedDevices} screens &nbsp; {totalTargetPlays} Plays
             </p>
@@ -848,7 +1038,7 @@ function ForecastStat({ label, value }: { label: string; value: string }) {
 function SummaryRow({
   label,
   value,
-  valueClassName = "text-slate-900",
+  valueClassName = "text-[#333333]",
 }: {
   label: string;
   value: string;
@@ -859,123 +1049,6 @@ function SummaryRow({
       <span>{label}</span>
       <span className={`font-semibold ${valueClassName}`}>{value}</span>
     </div>
-  );
-}
-
-export function Step1CampaignMedia({
-  campaign,
-  onNameChange,
-  onMediaUpload,
-  onRemoveMedia,
-}: {
-  campaign: CampaignWizardState["campaign"];
-  onNameChange: (value: string) => void;
-  onMediaUpload: (event: ChangeEvent<HTMLInputElement>) => void;
-  onRemoveMedia: () => void;
-}) {
-  return (
-    <section className="space-y-6">
-      <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
-        <div>
-          <label
-            htmlFor="campaign-name"
-            className="block text-lg font-semibold text-slate-900"
-          >
-            Campaign Name
-          </label>
-          <input
-            id="campaign-name"
-            aria-label="Campaign Name"
-            type="text"
-            value={campaign.name}
-            onChange={(event) => onNameChange(event.target.value)}
-            placeholder="Enter Campaign Name"
-            className="mt-3 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
-          />
-        </div>
-
-        <div className="mt-6">
-          <p className="text-lg font-semibold text-slate-900">Upload Media</p>
-
-          {campaign.fileName ? (
-            <div className="mt-4 rounded-2xl border border-slate-200 p-3">
-              <div className="flex flex-col gap-4 sm:flex-row">
-                <div className="h-28 w-full overflow-hidden rounded-xl bg-gradient-to-br from-[#a21caf] via-[#2563eb] to-[#0f172a] sm:w-40">
-                  {campaign.previewUrl ? (
-                    <video
-                      src={campaign.previewUrl}
-                      className="h-full w-full object-cover"
-                      muted
-                    />
-                  ) : (
-                    <div className="flex h-full items-center justify-center text-sm font-semibold text-white/90">
-                      Preview
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex-1">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-emerald-600">
-                        Upload Complete
-                      </p>
-                      <p className="mt-2 text-lg font-semibold text-slate-900">
-                        {campaign.fileName}
-                      </p>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={onRemoveMedia}
-                      className="rounded-full border border-slate-200 px-3 py-1.5 text-sm text-slate-500 transition hover:bg-slate-50"
-                    >
-                      Remove
-                    </button>
-                  </div>
-
-                  <div className="mt-4 flex flex-wrap gap-4 text-sm text-slate-500">
-                    <span className="inline-flex items-center gap-1">
-                      <Clock3 className="h-4 w-4" />
-                      {campaign.durationSeconds} seconds
-                    </span>
-                    <span className="inline-flex items-center gap-1">
-                      <FileText className="h-4 w-4" />
-                      {campaign.sizeLabel}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <label
-              htmlFor="campaign-media"
-              className="mt-4 flex cursor-pointer flex-col items-center justify-center rounded-[24px] border border-dashed border-violet-200 bg-violet-50/40 px-6 py-16 text-center transition hover:border-violet-300 hover:bg-violet-50"
-            >
-              <span className="flex h-14 w-14 items-center justify-center rounded-full bg-violet-700 text-white">
-                <Upload className="h-6 w-6" />
-              </span>
-              <span className="mt-5 text-lg font-semibold text-slate-900">
-                Drag &amp; drop your file here or Click to browse
-              </span>
-              <span className="mt-2 max-w-md text-sm text-slate-500">
-                Media guidelines: Duration 5-40 sec, Max size 50 MB, MP4 and MOV
-                supported.
-              </span>
-            </label>
-          )}
-
-          <input
-            id="campaign-media"
-            aria-label="Upload Media"
-            type="file"
-            accept="video/mp4,video/quicktime"
-            onChange={onMediaUpload}
-            className="sr-only"
-          />
-        </div>
-      </div>
-    </section>
   );
 }
 
@@ -1001,7 +1074,7 @@ export function Step2LocationScreens({
       <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex items-center gap-3">
           <MapPin className="h-5 w-5 text-violet-700" />
-          <h2 className="text-2xl font-semibold text-slate-900">
+          <h2 className="text-2xl font-semibold text-[#333333]">
             Location &amp; Screens
           </h2>
         </div>
@@ -1016,7 +1089,7 @@ export function Step2LocationScreens({
                 className={`flex cursor-pointer items-center gap-3 rounded-2xl border px-4 py-3 text-sm font-medium transition ${
                   isSelected
                     ? "border-violet-300 bg-violet-50 text-violet-800"
-                    : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
+                    : "border-slate-200 bg-white text-[#333333] hover:border-slate-300"
                 }`}
               >
                 <input
@@ -1032,7 +1105,7 @@ export function Step2LocationScreens({
                   className="h-4 w-4 rounded border-slate-300 text-violet-700 focus:ring-violet-400"
                 />
                 <span>{location.name}</span>
-                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-500">
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-[#333333]">
                   {location.devices.length}
                 </span>
               </label>
@@ -1060,10 +1133,10 @@ export function Step2LocationScreens({
                     className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left"
                   >
                     <div>
-                      <p className="text-lg font-semibold text-slate-900">
+                      <p className="text-lg font-semibold text-[#333333]">
                         {location.name}
                       </p>
-                      <p className="text-sm text-slate-500">
+                      <p className="text-sm text-[#333333]">
                         {location.devices.length} Screens
                       </p>
                     </div>
@@ -1081,7 +1154,7 @@ export function Step2LocationScreens({
 
                   {isExpanded ? (
                     <div className="border-t border-slate-200 px-5 py-4">
-                      <label className="flex items-center gap-3 text-sm font-medium text-slate-700">
+                      <label className="flex items-center gap-3 text-sm font-medium text-[#333333]">
                         <input
                           type="checkbox"
                           checked={allSelected}
@@ -1118,7 +1191,7 @@ export function Step2LocationScreens({
               );
             })
           ) : (
-            <div className="rounded-[24px] border border-dashed border-slate-300 px-6 py-12 text-center text-slate-500">
+            <div className="rounded-[24px] border border-dashed border-slate-300 px-6 py-12 text-center text-[#333333]">
               Select at least one location to view and choose its devices.
             </div>
           )}
@@ -1161,7 +1234,7 @@ export function Step3ScheduleTarget({
       <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex items-center gap-3">
           <CalendarDays className="h-5 w-5 text-violet-700" />
-          <h2 className="text-2xl font-semibold text-slate-900">
+          <h2 className="text-2xl font-semibold text-[#333333]">
             Schedule &amp; Target Plays
           </h2>
         </div>
@@ -1181,10 +1254,10 @@ export function Step3ScheduleTarget({
                   <div className="flex items-center gap-3">
                     <Monitor className="h-5 w-5 text-violet-700" />
                     <div>
-                      <p className="text-lg font-semibold text-slate-900">
+                      <p className="text-lg font-semibold text-[#333333]">
                         {location.name}
                       </p>
-                      <p className="text-sm text-slate-500">
+                      <p className="text-sm text-[#333333]">
                         {location.devices.length} Screens
                       </p>
                     </div>
@@ -1363,7 +1436,7 @@ export function Step4Submit({
       <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex items-center gap-3">
           <Check className="h-5 w-5 text-violet-700" />
-          <h2 className="text-2xl font-semibold text-slate-900">Submit</h2>
+          <h2 className="text-2xl font-semibold text-[#333333]">Submit</h2>
         </div>
 
         <div
@@ -1372,20 +1445,24 @@ export function Step4Submit({
         >
           <div className="space-y-6">
             <div className="rounded-[24px] border border-slate-200 p-5">
-              <h3 className="text-lg font-semibold text-slate-900">
+              <h3 className="text-lg font-semibold text-[#333333]">
                 Campaign Summary
               </h3>
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
                 <SummaryCard label="Campaign Name" value={state.campaign.name} />
                 <SummaryCard
                   label="Uploaded Media"
-                  value={state.campaign.fileName || "No file"}
+                  value={
+                    getUploadedMedia(state.campaign)
+                      .map((item) => item.fileName)
+                      .join(", ") || "No file"
+                  }
                 />
               </div>
             </div>
 
             <div className="rounded-[24px] border border-slate-200 p-5">
-              <h3 className="text-lg font-semibold text-slate-900">
+              <h3 className="text-lg font-semibold text-[#333333]">
                 Locations &amp; Devices
               </h3>
               <div className="mt-4 space-y-4">
@@ -1395,7 +1472,7 @@ export function Step4Submit({
                     className="rounded-2xl border border-slate-200 p-4"
                   >
                     <div className="flex items-center justify-between gap-4">
-                      <p className="text-lg font-semibold text-slate-900">
+                      <p className="text-lg font-semibold text-[#333333]">
                         {location.name}
                       </p>
                       <span className="rounded-full bg-violet-100 px-3 py-1 text-sm font-semibold text-violet-700">
@@ -1422,7 +1499,7 @@ export function Step4Submit({
             </div>
 
             <div className="rounded-[24px] border border-slate-200 p-5">
-              <h3 className="text-lg font-semibold text-slate-900">Schedule</h3>
+              <h3 className="text-lg font-semibold text-[#333333]">Schedule</h3>
               <div className="mt-4 space-y-4">
                 {selectedLocations.map((location) => {
                   const entry = state.schedule[location.id];
@@ -1432,7 +1509,7 @@ export function Step4Submit({
                       className="flex flex-col gap-3 rounded-2xl border border-slate-200 p-4 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between"
                     >
                       <div>
-                        <p className="text-lg font-semibold text-slate-900">
+                        <p className="text-lg font-semibold text-[#333333]">
                           {location.name}
                         </p>
                         <p>
@@ -1474,8 +1551,8 @@ export function Step4Submit({
 function SummaryCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl bg-slate-50 p-4">
-      <p className="text-sm text-slate-500">{label}</p>
-      <p className="mt-2 text-lg font-semibold text-slate-900">{value}</p>
+      <p className="text-sm text-[#333333]">{label}</p>
+      <p className="mt-2 text-lg font-semibold text-[#333333]">{value}</p>
     </div>
   );
 }
@@ -1483,43 +1560,51 @@ function SummaryCard({ label, value }: { label: string; value: string }) {
 function WizardFooter({
   step,
   canProceed,
+  draftSaving,
+  draftDisabled,
   onBack,
+  onSaveDraft,
   onNext,
 }: {
   step: WizardStep;
   canProceed: boolean;
+  draftSaving: boolean;
+  draftDisabled: boolean;
   onBack: () => void;
+  onSaveDraft: () => void;
   onNext: () => void;
 }) {
   return (
-    <div className="flex flex-col gap-3 rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-t border-[#E2E4EA] py-4">
       <button
         type="button"
         onClick={onBack}
-        className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 px-5 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+        className="inline-flex h-10 items-center justify-center gap-2 rounded-[10px] border border-[#E4E4E7] px-5 text-sm font-medium text-[#333333] transition hover:bg-slate-50"
       >
         <ArrowLeft className="h-4 w-4" />
         Back
       </button>
 
-      <div className="flex flex-col gap-3 sm:flex-row">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <button
           type="button"
-          className="rounded-2xl border border-slate-200 px-5 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+          onClick={onSaveDraft}
+          disabled={draftSaving || draftDisabled}
+          className="rounded-[10px] border border-[#D8D8DC] px-5 py-2.5 text-sm font-medium text-[#333333] transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          Save Draft
+          {draftSaving ? "Saving..." : "Save Draft"}
         </button>
         <button
           type="button"
           onClick={onNext}
           disabled={!canProceed}
-          className={`rounded-2xl px-6 py-3 text-sm font-semibold text-white transition ${
+          className={`rounded-[10px] px-6 py-2.5 text-sm font-semibold text-white transition ${
             canProceed
               ? "bg-custom-gradient shadow-lg shadow-violet-200 hover:opacity-95"
               : "bg-slate-300"
           }`}
         >
-          {step === 3 ? "Next" : "Next"}
+          Next
         </button>
       </div>
     </div>
@@ -1540,4 +1625,32 @@ function getCampaignDays(schedule?: ScheduleEntry) {
 
   const diff = endDate.getTime() - startDate.getTime();
   return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+}
+
+function getVideoDuration(file: File): Promise<number> {
+  return new Promise((resolve) => {
+    const objectUrl = URL.createObjectURL(file);
+    const video = document.createElement("video");
+
+    const cleanup = () => {
+      URL.revokeObjectURL(objectUrl);
+      video.removeAttribute("src");
+      video.load();
+    };
+
+    video.preload = "metadata";
+    video.onloadedmetadata = () => {
+      const duration =
+        Number.isFinite(video.duration) && video.duration > 0
+          ? Number(video.duration.toFixed(2))
+          : 0;
+      cleanup();
+      resolve(duration);
+    };
+    video.onerror = () => {
+      cleanup();
+      resolve(0);
+    };
+    video.src = objectUrl;
+  });
 }

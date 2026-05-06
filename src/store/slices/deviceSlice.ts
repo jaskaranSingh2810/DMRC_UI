@@ -167,7 +167,9 @@ export const fetchDevices = createAsyncThunk<
       );
     }
 
-    return getApiData(response.data);
+    const data = getApiData(response.data);
+
+    return data;
   } catch (error) {
     return rejectWithValue(parseApiError(error, "Unable to fetch devices."));
   }

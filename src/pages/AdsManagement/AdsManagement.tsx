@@ -470,7 +470,7 @@ function StatCard({
       className={`flex items-center justify-between rounded-[8px] border bg-white px-5 py-4 text-left shadow-[rgba(0,0,0,0.05)] transition ${isActive ? "border-[#5E1B7F] ring-2 ring-[#5E1B7F1F]" : accentStyles[accent].card}`}
     >
       <div>
-        <p className="text-[16px] font-medium text-slate-700">{label}</p>
+        <p className="text-[16px] font-medium text-[#333333]">{label}</p>
         <p className="mt-2 text-[24px] font-semibold leading-none text-slate-900">
           {value}
         </p>
@@ -519,7 +519,7 @@ function AdConfirmModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl border border-slate-300 px-4 py-3 font-semibold text-slate-700 transition hover:bg-slate-50"
+            className="rounded-xl border border-slate-300 px-4 py-3 font-semibold text-[#333333] transition hover:bg-slate-50"
           >
             Cancel
           </button>

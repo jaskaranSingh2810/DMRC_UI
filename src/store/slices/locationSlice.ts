@@ -37,7 +37,7 @@ export const fetchLocations = createAsyncThunk<
 >("locations/fetchLocations", async (_, { rejectWithValue }) => {
   try {
     const response: AxiosResponse<ApiEnvelope<DeviceLocation[]> | DeviceLocation[]> =
-      await axiosInstance.get("/api/v1/dmrc/device/locations");
+      await axiosInstance.get("http://localhost:8086/api/v1/dmrc/device/locations");
     const payload = response.data;
 
     if (Array.isArray(payload)) {

@@ -1,9 +1,4 @@
-import {
-  ChevronDown,
-  X,
-  PanelRightOpen,
-  PanelRightClose,
-} from "lucide-react";
+import { ChevronDown, X, PanelRightOpen, PanelRightClose } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import LogoutConfirmModal from "@/components/LogoutConfirmModal";
@@ -59,7 +54,7 @@ export function mapBackendMenu(menu: SidebarMenuItem[]): MenuItem[] {
         label: menuItem.name,
         path: mappedPaths,
         icon: mappedIcon,
-        permission: menuItem.permission || '',
+        permission: menuItem.permission || "",
       },
     ];
   });
@@ -74,6 +69,7 @@ export default function Sidebar({
 }) {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const user = useAppSelector((state) => state.auth.user);
   const [collapsed, setCollapsed] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
@@ -85,6 +81,8 @@ export default function Sidebar({
     const handleResize = () => {
       if (window.innerWidth < 768) {
         setCollapsed(false);
+      } else {
+        setIsOpen(false);
       }
     };
 
@@ -93,6 +91,12 @@ export default function Sidebar({
 
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  useEffect(() => {
+    if (window.innerWidth < 768) {
+      setIsOpen(false);
+    }
+  }, [pathname, setIsOpen]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -111,7 +115,7 @@ export default function Sidebar({
   const menus = useMemo(
     () => mapBackendMenu(user?.menu ?? []),
     [user?.menu, user?.menu?.length],
-  );  
+  );
 
   const userPermissions = useMemo(
     () => new Set(user?.permissions || []),
@@ -150,7 +154,7 @@ export default function Sidebar({
 
       <aside
         className={`
-    fixed z-50 h-full bg-custom-gradient text-white transition-all duration-300
+    fixed z-50 h-full bg-custom-gradient text-white transition-all duration-300 h-100vh overflow-auto
     
     ${isOpen ? "translate-x-0" : "-translate-x-full"}
     md:translate-x-0 md:static
@@ -231,7 +235,6 @@ export default function Sidebar({
                   profileMenuOpen ? "rotate-180" : ""
                 }`}
               />
-              
             </button>
 
             {profileMenuOpen && !collapsed ? (
@@ -244,8 +247,14 @@ export default function Sidebar({
                   className="flex w-full items-center gap-4 rounded-xl px-1 py-3 text-left text-white transition hover:bg-white/10"
                   role="menuitem"
                 >
-                  <img src="/Images/Sidebar/Change_Password.png" alt="Change Password" className="h-5 w-5" />
-                  <span className="text-[14px] font-medium">Change Password</span>
+                  <img
+                    src="/Images/Sidebar/Change_Password.png"
+                    alt="Change Password"
+                    className="h-5 w-5"
+                  />
+                  <span className="text-[14px] font-medium">
+                    Change Password
+                  </span>
                 </button>
 
                 <button
@@ -254,7 +263,11 @@ export default function Sidebar({
                   className="flex w-full items-center gap-4 rounded-xl px-1 py-3 text-left text-white transition hover:bg-white/10"
                   role="menuitem"
                 >
-                  <img src="/Images/Sidebar/Logout.png" alt="Logout" className="h-5 w-5" />
+                  <img
+                    src="/Images/Sidebar/Logout.png"
+                    alt="Logout"
+                    className="h-5 w-5"
+                  />
                   <span className="text-[14px] font-medium">Logout</span>
                 </button>
               </div>

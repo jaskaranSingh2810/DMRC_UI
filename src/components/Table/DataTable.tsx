@@ -165,7 +165,7 @@ export default function DataTable<T>({
             <table className="w-full text-xs sm:text-sm ">
               <thead className="sticky top-0 z-20 text-[#333333] shadow-sm">
                 <tr>
-                  {columns.map((col) => (
+                  {columns && columns?.filter((col) => !col.isHidden).map((col) => (
                     <th
                       key={String(col.key)}
                       className="border-r bg-[#E7E5F0] border-[#CDD4DA] px-3 py-3 text-left last:border-r-0 sm:px-4 sm:py-4"
@@ -183,7 +183,7 @@ export default function DataTable<T>({
                               className={`rounded-full p-2 transition ${
                                 sortState?.key === String(col.key)
                                   ? "bg-white text-[#4e146a]"
-                                  : "text-[#5E1B7F] hover:bg-slate-100 hover:text-slate-700"
+                                  : "text-[#5E1B7F] hover:bg-slate-100 hover:text-[#333333]"
                               }`}
                               aria-label={`Sort ${col.label}`}
                             >
@@ -212,7 +212,7 @@ export default function DataTable<T>({
                                 className={`rounded-full p-2 transition ${
                                   filterDrafts[String(col.key)]
                                     ? "bg-white text-[#5E1B7F]"
-                                    : "text-[#5E1B7F] hover:bg-slate-100 hover:text-slate-700"
+                                    : "text-[#5E1B7F] hover:bg-slate-100 hover:text-[#333333]"
                                 }`}
                                 aria-label={`Filter ${col.label}`}
                               >
@@ -255,7 +255,7 @@ export default function DataTable<T>({
                       {columns.map((col) => (
                         <td
                           key={String(col.key)}
-                          className="whitespace-nowrap border-r border-slate-200 px-3 py-3 text-[12px] font-[400] text-slate-700 last:border-r-0 sm:px-4 sm:py-4"
+                          className="whitespace-nowrap border-r border-slate-200 px-3 py-3 text-[12px] font-[400] text-[#333333] last:border-r-0 sm:px-4 sm:py-4"
                         >
                           {col.render
                             ? col.render(row)
@@ -335,7 +335,7 @@ export default function DataTable<T>({
                       }));
                       onFilter?.(openFilterKey, "");
                     }}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#333333]"
                     aria-label={`Clear ${
                       openFilterColumn?.label ?? "column"
                     } filter`}

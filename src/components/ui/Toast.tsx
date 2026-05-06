@@ -76,7 +76,7 @@ export default function Toast({ toast, onClose }: ToastProps) {
         <button
           type="button"
           onClick={() => onClose(toast.id)}
-          className="rounded-full p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+          className="rounded-full p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-[#333333]"
           aria-label="Close notification"
         >
           <X size={16} />

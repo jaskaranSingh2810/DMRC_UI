@@ -4,6 +4,7 @@ import type { ManagedUserRecord } from "@/types";
 interface UserStatusConfirmModalProps {
   user: ManagedUserRecord;
   nextStatus: "Active" | "Inactive";
+  loading?: boolean;
   onClose: () => void;
   onConfirm: () => Promise<void>;
 }
@@ -11,6 +12,7 @@ interface UserStatusConfirmModalProps {
 export default function UserStatusConfirmModal({
   user,
   nextStatus,
+  loading = false,
   onClose,
   onConfirm,
 }: UserStatusConfirmModalProps) {
@@ -36,14 +38,16 @@ export default function UserStatusConfirmModal({
           <button
             type="button"
             onClick={() => void onConfirm()}
-            className="rounded-[10px] bg-custom-gradient px-4 py-3 text-[14px] font-semibold text-white"
+            disabled={loading}
+            className="rounded-[10px] bg-custom-gradient px-4 py-3 text-[14px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-70"
           >
-            Yes
+            {loading ? "Processing..." : "Yes"}
           </button>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-[10px] border border-[#D0D5DD] px-4 py-3 text-[14px] font-semibold text-[#344054]"
+            disabled={loading}
+            className="rounded-[10px] border border-[#D0D5DD] px-4 py-3 text-[14px] font-semibold text-[#344054] disabled:cursor-not-allowed disabled:opacity-70"
           >
             Cancel
           </button>

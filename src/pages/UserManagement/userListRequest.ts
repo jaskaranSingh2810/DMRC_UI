@@ -1,3 +1,6 @@
+import type { UserModuleFilter } from "@/types/user";
+export type { UserModuleFilter };
+
 type UserFilters = Record<string, string | undefined>;
 
 export type UserStatFilter = "all" | "active" | "inactive";
@@ -19,14 +22,11 @@ export interface UserListRequest {
   employeeName?: string;
   emailId?: string;
   mobileNumber?: string;
-  password?: string;
-  locationAccess?: string;
-  moduleAccess?: string;
   lastLoggedIn?: string;
   createdOn?: string;
   createdBy?: string;
   status?: string;
-  module?: string;
+  moduleIds?: number[];
   sortCriteria?: UserSortCriteria[];
 }
 
@@ -48,14 +48,14 @@ export function buildUserListRequest({
   filters,
   pageNumber,
   pageSize,
-  selectedModule,
+  selectedModules,
   selectedStatFilter,
   sortState,
 }: {
   filters: UserFilters;
   pageNumber: number;
   pageSize: number;
-  selectedModule: string;
+  selectedModules: UserModuleFilter[];
   selectedStatFilter: UserStatFilter;
   sortState: SortState | null;
 }): UserListRequest {
@@ -70,13 +70,6 @@ export function buildUserListRequest({
     ...(filters.mobileNumber?.trim()
       ? { mobileNumber: filters.mobileNumber.trim() }
       : {}),
-    ...(filters.password?.trim() ? { password: filters.password.trim() } : {}),
-    ...(filters.locationAccess?.trim()
-      ? { locationAccess: filters.locationAccess.trim() }
-      : {}),
-    ...(filters.moduleAccess?.trim()
-      ? { moduleAccess: filters.moduleAccess.trim() }
-      : {}),
     ...(filters.lastLoggedIn?.trim()
       ? { lastLoggedIn: filters.lastLoggedIn.trim() }
       : {}),
@@ -86,7 +79,11 @@ export function buildUserListRequest({
     ...(filters.createdBy?.trim()
       ? { createdBy: filters.createdBy.trim() }
       : {}),
-    ...(selectedModule !== "all" ? { module: selectedModule } : {}),
+    ...(selectedModules.length
+      ? {
+          moduleIds: selectedModules.map((moduleOption) => moduleOption.id),
+        }
+      : {}),
     ...(selectedStatFilter !== "all"
       ? { status: getApiUserStatus(selectedStatFilter) }
       : filters.status?.trim()

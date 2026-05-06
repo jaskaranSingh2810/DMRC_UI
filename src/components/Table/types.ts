@@ -7,6 +7,7 @@ export interface Column<T> {
   filterType?: "text" | "date";
   sortable?: boolean;
   render?: (row: T) => ReactNode;
+  isHidden?: boolean;
 }
 
 export interface SortState {

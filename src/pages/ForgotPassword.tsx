@@ -40,7 +40,7 @@ export default function ForgotPassword() {
     >
       <form onSubmit={handleSubmit} className="space-y-5">
         <label className="block">
-          <span className="mb-2 block text-sm font-semibold text-slate-700">
+          <span className="mb-2 block text-sm font-semibold text-[#333333]">
             Email
           </span>
           <input

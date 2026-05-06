@@ -1,6 +1,8 @@
 import type { Ad } from "@/types";
 
 export type WizardStep = 1 | 2 | 3 | 4;
+export type MediaMode = "AUTO_FIT" | "CUSTOM";
+export type UploadStatus = "empty" | "uploaded";
 
 export interface DeviceOption {
   id: string;
@@ -13,13 +15,23 @@ export interface LocationOption {
   devices: DeviceOption[];
 }
 
-export interface CampaignMediaState {
-  name: string;
-  mediaFile: File | null;
+export interface CampaignMediaSlotState {
+  id: string;
+  label: string;
+  file: File | null;
   previewUrl: string;
   fileName: string;
-  durationSeconds: number;
   sizeLabel: string;
+  durationSeconds: number;
+  status: UploadStatus;
+  remoteFilePath: string | null;
+}
+
+export interface CampaignMediaState {
+  contentId: string | number | null;
+  name: string;
+  mediaMode: MediaMode;
+  uploadedMedia: CampaignMediaSlotState[];
 }
 
 export interface LocationSelectionState {
@@ -47,4 +59,23 @@ export interface CampaignWizardState {
 
 export interface AdCampaignWizardProps {
   initialAd?: Ad | null;
+}
+
+export interface DraftMediaResponse {
+  fileName: string;
+  filePath: string;
+  fileSize: number;
+  duration: number;
+}
+
+export interface DraftContentResponse {
+  contentId: string | number;
+  contentName: string;
+  contentType: string;
+  isDraft: boolean;
+  isPublish: boolean;
+  status: string;
+  createdBy: string | null;
+  publishedOn: string | null;
+  media: DraftMediaResponse[];
 }

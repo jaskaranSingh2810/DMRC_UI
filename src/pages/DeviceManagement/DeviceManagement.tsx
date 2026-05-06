@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { use, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import {
   AlertTriangle,
@@ -138,6 +138,13 @@ export default function DeviceManagement() {
   const { items: locationList, listLoaded: locationListLoaded } =
     useAppSelector((state) => state.locations);
 
+  const { user } = useAppSelector((state) => state.auth);
+
+  const data = items.map((device) => ({
+    ...device,
+    device: `${device.brand}-${device.model}-${device.deviceSize}`,
+  }));
+
   const [page, setPage] = useState(1);
   const [sortState, setSortState] = useState<SortState | null>(null);
   const [editingDevice, setEditingDevice] = useState<DeviceRecord | null>(null);
@@ -223,9 +230,13 @@ export default function DeviceManagement() {
       sortable: true,
     },
 
-    { label: "Brand", key: "brand", filterable: true, sortable: true },
+    // { label: "Brand", key: "brand", filterable: true, sortable: true },
 
-    { label: "Model", key: "model", filterable: true, sortable: true },
+    // { label: "Model", key: "model", filterable: true, sortable: true },
+
+    // { label: "Size", key: "deviceSize", filterable: true, sortable: true },
+
+    { label: "Device", key: "device", filterable: false, sortable: false },
 
     {
       label: "Orientation",
@@ -233,7 +244,7 @@ export default function DeviceManagement() {
       filterable: true,
       sortable: true,
     },
-    
+
     {
       label: "Landmark",
       key: "landmark",
@@ -241,8 +252,6 @@ export default function DeviceManagement() {
       sortable: true,
       render: (row: DeviceRecord) => row.landmark ?? "-",
     },
-
-    { label: "Size", key: "deviceSize", filterable: true, sortable: true },
 
     {
       label: "Locations",
@@ -253,16 +262,16 @@ export default function DeviceManagement() {
         row.locationName ?? row.locations?.locationName ?? "-",
     },
 
-    { label: "Created By", key: "createdBy", filterable: true, sortable: true },
+    // { label: "Created By", key: "createdBy", filterable: true, sortable: true },
 
-    {
-      label: "Created On",
-      key: "createdAt",
-      filterable: true,
-      filterType: "date",
-      sortable: true,
-      render: (row: DeviceRecord) => formatCreatedAt(row.createdAt),
-    },
+    // {
+    //   label: "Created On",
+    //   key: "createdAt",
+    //   filterable: true,
+    //   filterType: "date",
+    //   sortable: true,
+    //   render: (row: DeviceRecord) => formatCreatedAt(row.createdAt),
+    // },
 
     {
       label: "Status",
@@ -359,7 +368,7 @@ export default function DeviceManagement() {
 
       <div className="shadow-sm">
         <DataTable
-          data={items}
+          data={data}
           columns={columns}
           loading={loading}
           page={currentPage || page}
@@ -397,7 +406,7 @@ export default function DeviceManagement() {
               updateDevice({
                 id: editingDevice.id,
                 ...payload,
-                userName: "Jaskaran Singh",
+                userName: user?.profile?.username ?? "SYSTEM",
               }),
             );
 
@@ -489,7 +498,7 @@ export default function DeviceManagement() {
             const result = await dispatch(
               removeDevice({
                 id: deviceAction.device.id,
-                userName: "Anamika Kumari",
+                userName: user?.profile?.username ?? "SYSTEM",
                 remarks: removeRemarks,
               }),
             );
@@ -561,7 +570,7 @@ function StatCard({
       className={`flex items-center gap-2 justify-between rounded-[8px] border bg-white px-5 py-4 text-left shadow-[rgba(0, 0, 0, 0.05)] transition ${isActive ? "border-[#5E1B7F] ring-2 ring-[#5E1B7F1F]" : accentStyles[accent].card}`}
     >
       <div>
-        <p className="text-[16px] font-medium text-slate-700">{label}</p>
+        <p className="text-[16px] font-medium text-[#333333]">{label}</p>
         <p className="mt-2 text-[24px] font-semibold leading-none text-slate-900">
           {value}
         </p>
@@ -631,7 +640,7 @@ function DeviceConfirmModal({
 
         {isRemoveAction ? (
           <label className="mt-6 block text-left">
-            <span className="mb-2 block text-sm font-semibold text-slate-700">
+            <span className="mb-2 block text-sm font-semibold text-[#333333]">
               * Reason
             </span>
             <textarea
@@ -664,7 +673,7 @@ function DeviceConfirmModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl border border-slate-300 px-4 py-3 font-semibold text-slate-700 transition hover:bg-slate-50"
+            className="rounded-xl border border-slate-300 px-4 py-3 font-semibold text-[#333333] transition hover:bg-slate-50"
           >
             Cancel
           </button>

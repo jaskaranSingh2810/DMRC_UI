@@ -7,16 +7,17 @@ import {
   setSelectedLocationId,
 } from "@/store/slices/deviceSlice";
 import { fetchLocations } from "@/store/slices/locationSlice";
-import { setSelectedModule } from "@/store/slices/userSlice";
-import { userModuleOptions } from "@/pages/UserManagement/userManagementData";
+import {
+  fetchUserModules,
+  setSelectedModules,
+} from "@/store/slices/usersSlice";
 import { useModal } from "./ModalContext";
 
-type HeaderAction =
-  | {
-      type: "navigate";
-      label: string;
-      path: string;
-    };
+type HeaderAction = {
+  type: "navigate";
+  label: string;
+  path: string;
+};
 
 const headerConfig: Record<
   string,
@@ -77,6 +78,16 @@ export default function Header({
   const navigate = useNavigate();
   const isDeviceManagementPage = pathname === "/device-management";
   const isUserManagementPage = pathname === "/user-management";
+  const isCreatePage =
+    pathname.includes("/ads-management/create") ||
+    /^\/ads-management\/[^/]+\/edit$/.test(pathname) ||
+    pathname.includes("/notice-management/create") ||
+    /^\/notice-management\/[^/]+\/edit$/.test(pathname) ||
+    pathname.includes("/ticker-management/create") ||
+    /^\/ticker-management\/[^/]+\/edit$/.test(pathname) ||
+    pathname.includes("/user-management/create") ||
+    /^\/user-management\/[^/]+\/edit$/.test(pathname);
+
   const [locationMenuOpen, setLocationMenuOpen] = useState(false);
   const [moduleMenuOpen, setModuleMenuOpen] = useState(false);
   const locationMenuRef = useRef<HTMLDivElement | null>(null);
@@ -86,7 +97,9 @@ export default function Header({
   );
   const { items: locationList, listLoaded: locationListLoaded } =
     useAppSelector((state) => state.locations);
-  const { selectedModule } = useAppSelector((state) => state.users);
+  const { availableModules, selectedModules } = useAppSelector(
+    (state) => state.users,
+  );
 
   const config = Object.entries(headerConfig).find(
     ([key]) => pathname === key || pathname.startsWith(key + "/"),
@@ -97,6 +110,12 @@ export default function Header({
       void dispatch(fetchLocations());
     }
   }, [dispatch, isDeviceManagementPage, locationListLoaded]);
+
+  useEffect(() => {
+    if (isUserManagementPage && availableModules.length === 0) {
+      void dispatch(fetchUserModules());
+    }
+  }, [availableModules.length, dispatch, isUserManagementPage]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -123,9 +142,12 @@ export default function Header({
     locationList.find(
       (location) => String(location.locationId) === String(selectedLocationId),
     )?.locationName ?? "All Locations";
-  const availableModules = userModuleOptions.map((moduleOption) => moduleOption.name);
   const selectedModuleLabel =
-    selectedModule === "all" ? "All Modules" : selectedModule;
+    selectedModules.length === 0
+      ? "All Modules"
+      : selectedModules.length === 1
+        ? selectedModules[0].name
+        : `${selectedModules.length} Modules`;
 
   const handleAction = () => {
     if (!config.action) return;
@@ -141,7 +163,9 @@ export default function Header({
   };
 
   return (
-    <div className="flex justify-between p-4 bg-[rgb(245 247 250 / var(--tw-bg-opacity, 1))]">
+    <div
+      className={`flex justify-between p-4 bg-[rgb(245 247 250 / var(--tw-bg-opacity, 1))] ${isCreatePage && "hidden"} rounded-[12px]`}
+    >
       <div className="flex gap-3 items-center">
         <button onClick={toggleSidebar} className="md:hidden">
           <Menu />
@@ -149,14 +173,14 @@ export default function Header({
         <h1 className="text-[24px] font-semibold">{config.title}</h1>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center justify-end gap-3">
         {isDeviceManagementPage ? (
           <>
             <div ref={locationMenuRef} className="relative">
               <button
                 type="button"
                 onClick={() => setLocationMenuOpen((current) => !current)}
-                className="flex min-w-[170px] items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-[6px] text-[14px] font-semibold text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                className="flex min-w-[170px] items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-[6px] text-[14px] font-semibold text-[#333333] outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                 aria-haspopup="listbox"
                 aria-expanded={locationMenuOpen}
               >
@@ -235,7 +259,7 @@ export default function Header({
                   window.URL.revokeObjectURL(url);
                 }
               }}
-              className="flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-[6px] text-[14px] font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70 bg-white"
+              className="flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-[6px] text-[14px] font-semibold text-[#333333] transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70 bg-white"
             >
               Download Script
               <Download size={16} absoluteStrokeWidth={true} />
@@ -248,7 +272,7 @@ export default function Header({
             <button
               type="button"
               onClick={() => setModuleMenuOpen((current) => !current)}
-              className="flex min-w-[170px] items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-[6px] text-[14px] font-semibold text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              className="flex min-w-[170px] items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-[6px] text-[14px] font-semibold text-[#333333] outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               aria-haspopup="listbox"
               aria-expanded={moduleMenuOpen}
             >
@@ -262,33 +286,45 @@ export default function Header({
             </button>
 
             {moduleMenuOpen ? (
-              <div className="absolute right-0 top-[calc(100%+0.35rem)] z-30 min-w-[170px] overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg">
+              <div className="absolute right-0 top-[calc(100%+0.35rem)] z-30 min-w-[220px] overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg">
                 <button
                   type="button"
                   onClick={() => {
-                    dispatch(setSelectedModule("all"));
-                    setModuleMenuOpen(false);
+                    dispatch(setSelectedModules([]));
                   }}
                   className={`flex w-full items-center gap-3 px-4 py-3 text-sm transition ${
-                    selectedModule === "all"
+                    selectedModules.length === 0
                       ? "bg-[#F4ECFA] text-[#7C3AA8]"
                       : "bg-white text-[#333333] hover:bg-slate-50"
                   }`}
                   role="option"
-                  aria-selected={selectedModule === "all"}
+                  aria-selected={selectedModules.length === 0}
                 >
+                  <input
+                    type="checkbox"
+                    checked={selectedModules.length === 0}
+                    readOnly
+                    className="h-4 w-4 accent-[#5E1B7F]"
+                  />
                   <span>All Modules</span>
                 </button>
-                {availableModules.map((moduleName) => {
-                  const isSelected = selectedModule === moduleName;
+                {availableModules.map((moduleOption) => {
+                  const isSelected = selectedModules.some(
+                    (selectedModule) => selectedModule.id === moduleOption.id,
+                  );
 
                   return (
                     <button
-                      key={moduleName}
+                      key={moduleOption.id}
                       type="button"
                       onClick={() => {
-                        dispatch(setSelectedModule(moduleName));
-                        setModuleMenuOpen(false);
+                        const nextModules = isSelected
+                          ? selectedModules.filter(
+                              (selectedModule) =>
+                                selectedModule.id !== moduleOption.id,
+                            )
+                          : [...selectedModules, moduleOption];
+                        dispatch(setSelectedModules(nextModules));
                       }}
                       className={`flex w-full items-center gap-3 px-4 py-3 text-sm transition ${
                         isSelected
@@ -298,7 +334,13 @@ export default function Header({
                       role="option"
                       aria-selected={isSelected}
                     >
-                      <span>{moduleName}</span>
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        readOnly
+                        className="h-4 w-4 accent-[#5E1B7F]"
+                      />
+                      <span>{moduleOption.name}</span>
                     </button>
                   );
                 })}

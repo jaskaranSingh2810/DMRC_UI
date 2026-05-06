@@ -1,29 +1,28 @@
 import { useEffect, useMemo, useState } from "react";
-import { Eye, EyeOff } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import ActionMenu from "@/components/Table/ActionMenu";
 import DataTable from "@/components/Table/DataTable";
-import type { SortState } from "@/components/Table/types";
+import type { Column, SortState } from "@/components/Table/types";
+import { getLocationAccessLabel } from "@/api/userManagementService";
 import { useToast } from "@/hooks/useToast";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { fetchLocations } from "@/store/slices/locationSlice";
 import {
   clearUserMessages,
+  fetchUserModules,
   fetchUsers,
+  resetUserPassword,
   setSelectedUserStatFilter,
   setUserFilter,
-  updateUserAccess,
-  updateUserPassword,
+  setUserSorting,
   updateUserStatus,
-} from "@/store/slices/userSlice";
-import type { ManagedUserRecord } from "@/types";
-import UserAccessModal from "./components/UserAccessModal";
+} from "@/store/slices/usersSlice";
+import type { ManagedUserRecord } from "@/types/user";
 import UserPasswordModal from "./components/UserPasswordModal";
-import UserPasswordSuccessModal from "./components/UserPasswordSuccessModal";
 import UserStatCard from "./components/UserStatCard";
 import UserStatusBadge from "./components/UserStatusBadge";
 import UserStatusConfirmModal from "./components/UserStatusConfirmModal";
 import { buildUserListRequest } from "./userListRequest";
-import { userLocationOptions } from "./userManagementData";
 
 type UserActionState =
   | {
@@ -67,27 +66,10 @@ function formatDateTime(value?: string | null): string {
   });
 }
 
-function getLocationAccessLabel(user: ManagedUserRecord): string {
-  if (user.locationAccess?.length) {
-    return user.locationAccess.join(", ");
-  }
-
-  return "-";
-}
-
-function getModuleAccessLabel(user: ManagedUserRecord): string {
-  if (user.moduleAccess?.length) {
-    return user.moduleAccess.join(", ");
-  }
-
-  return "-";
-}
-
 export default function UserManagement() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const toast = useToast();
-  const { user: authUser } = useAppSelector((state) => state.auth);
   const {
     items,
     loading,
@@ -97,36 +79,35 @@ export default function UserManagement() {
     currentPage,
     totalPages,
     pageSize,
-    selectedModule,
+    selectedModules,
     selectedStatFilter,
     summary,
+    availableModules,
+    passwordResetLoading,
   } = useAppSelector((state) => state.users);
+  const { items: locationList, listLoaded: locationListLoaded } =
+    useAppSelector((state) => state.locations);
+
   const [page, setPage] = useState(1);
   const [sortState, setSortState] = useState<SortState | null>(null);
   const [statusAction, setStatusAction] = useState<UserActionState>(null);
   const [passwordUser, setPasswordUser] = useState<ManagedUserRecord | null>(null);
-  const [accessUser, setAccessUser] = useState<ManagedUserRecord | null>(null);
-  const [showPasswordSuccess, setShowPasswordSuccess] = useState(false);
-  const [visiblePasswords, setVisiblePasswords] = useState<Record<string, boolean>>(
-    {},
+  const [passwordResetMessage, setPasswordResetMessage] = useState<string | null>(
+    null,
   );
-
-  const request = useMemo(
-    () =>
-      buildUserListRequest({
-        filters,
-        pageNumber: page,
-        pageSize,
-        selectedModule,
-        selectedStatFilter,
-        sortState,
-      }),
-    [filters, page, pageSize, selectedModule, selectedStatFilter, sortState],
-  );
+  const [passwordResetError, setPasswordResetError] = useState<string | null>(null);
 
   useEffect(() => {
-    void dispatch(fetchUsers(request));
-  }, [dispatch, request]);
+    if (!locationListLoaded) {
+      void dispatch(fetchLocations());
+    }
+  }, [dispatch, locationListLoaded]);
+
+  useEffect(() => {
+    if (availableModules.length === 0) {
+      void dispatch(fetchUserModules());
+    }
+  }, [availableModules.length, dispatch]);
 
   useEffect(() => {
     if (successMessage) {
@@ -136,32 +117,61 @@ export default function UserManagement() {
   }, [dispatch, successMessage, toast]);
 
   useEffect(() => {
-    if (error) {
+    if (error && !passwordUser) {
       toast.error(error, "User");
       dispatch(clearUserMessages());
     }
-  }, [dispatch, error, toast]);
+  }, [dispatch, error, passwordUser, toast]);
 
   useEffect(() => {
     setPage(1);
-  }, [selectedModule, selectedStatFilter]);
+  }, [selectedModules, selectedStatFilter]);
+
+  const request = useMemo(
+    () =>
+      buildUserListRequest({
+        filters,
+        pageNumber: page,
+        pageSize,
+        selectedModules,
+        selectedStatFilter,
+        sortState,
+      }),
+    [filters, page, pageSize, selectedModules, selectedStatFilter, sortState],
+  );
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      void dispatch(fetchUsers(request));
+    }, 300);
+
+    return () => window.clearTimeout(timeout);
+  }, [dispatch, request]);
 
   const refetchUsers = async () => {
-    await dispatch(
-      fetchUsers(
-        buildUserListRequest({
-          filters,
-          pageNumber: page,
-          pageSize,
-          selectedModule,
-          selectedStatFilter,
-          sortState,
-        }),
+    await dispatch(fetchUsers(request));
+  };
+
+  const handleStatCardClick = (nextFilter: "all" | "active" | "inactive") => {
+    dispatch(
+      setSelectedUserStatFilter(
+        nextFilter === "all"
+          ? "all"
+          : selectedStatFilter === nextFilter
+            ? "all"
+            : nextFilter,
       ),
     );
   };
 
-  const columns = [
+  const columns: Column<ManagedUserRecord>[] = [
+    {
+      label: "User ID",
+      key: "id",
+      filterable: true,
+      sortable: true,
+      isHidden: false
+    },
     {
       label: "Emp ID",
       key: "empId",
@@ -187,45 +197,17 @@ export default function UserManagement() {
       sortable: true,
     },
     {
-      label: "Password",
-      key: "password",
-      filterable: true,
-      render: (row: ManagedUserRecord) => {
-        const passwordKey = String(row.id);
-        const isVisible = visiblePasswords[passwordKey];
-
-        return (
-          <div className="flex items-center gap-2">
-            <span>{isVisible ? row.password : "XXXXXXXX"}</span>
-            <button
-              type="button"
-              onClick={() =>
-                setVisiblePasswords((current) => ({
-                  ...current,
-                  [passwordKey]: !current[passwordKey],
-                }))
-              }
-              className="text-[#667085]"
-            >
-              {isVisible ? <EyeOff size={14} /> : <Eye size={14} />}
-            </button>
-          </div>
-        );
-      },
-    },
-    {
       label: "Location Access",
       key: "locationAccess",
-      filterable: true,
-      sortable: true,
-      render: (row: ManagedUserRecord) => getLocationAccessLabel(row),
+      render: (row) =>
+        row.locationAccess.length
+          ? row.locationAccess.join(", ")
+          : getLocationAccessLabel(row.accessAssignments, locationList),
     },
     {
       label: "Module Access",
       key: "moduleAccess",
-      filterable: true,
-      sortable: true,
-      render: (row: ManagedUserRecord) => getModuleAccessLabel(row),
+      render: (row) => (row.moduleAccess.length ? row.moduleAccess.join(", ") : "-"),
     },
     {
       label: "Last Logged in",
@@ -233,15 +215,7 @@ export default function UserManagement() {
       filterable: true,
       filterType: "date",
       sortable: true,
-      render: (row: ManagedUserRecord) => formatDateTime(row.lastLoggedIn),
-    },
-    {
-      label: "Created On",
-      key: "createdOn",
-      filterable: true,
-      filterType: "date",
-      sortable: true,
-      render: (row: ManagedUserRecord) => formatDate(row.createdOn),
+      render: (row) => formatDateTime(row.lastLoggedIn),
     },
     {
       label: "Created By",
@@ -250,31 +224,40 @@ export default function UserManagement() {
       sortable: true,
     },
     {
+      label: "Created On",
+      key: "createdOn",
+      filterable: true,
+      filterType: "date",
+      sortable: true,
+      render: (row) => formatDate(row.createdOn),
+    },
+    {
       label: "Status",
       key: "status",
       filterable: true,
-      render: (row: ManagedUserRecord) => <UserStatusBadge status={row.status} />,
+      render: (row) => <UserStatusBadge status={row.status} />,
     },
     {
       label: "Actions",
       key: "actions",
-      render: (row: ManagedUserRecord) => (
+      render: (row) => (
         <ActionMenu
           actions={[
             {
-              label: "Edit User Details",
+              label: "Edit User",
               onClick: () => navigate(`/user-management/${row.id}/edit`),
             },
             {
-              label: "Change Password",
-              onClick: () => setPasswordUser(row),
+              label: "Reset Password",
+              onClick: () => {
+                setPasswordResetMessage(null);
+                setPasswordResetError(null);
+                dispatch(clearUserMessages());
+                setPasswordUser(row);
+              },
             },
             {
-              label: "Manage Access",
-              onClick: () => setAccessUser(row),
-            },
-            {
-              label: row.status === "Inactive" ? "Activate" : "Deactivate",
+              label: row.status === "Inactive" ? "Activate User" : "Deactivate User",
               onClick: () =>
                 setStatusAction({
                   user: row,
@@ -285,7 +268,7 @@ export default function UserManagement() {
         />
       ),
     },
-  ];
+  ];  
 
   return (
     <div className="space-y-6">
@@ -296,7 +279,7 @@ export default function UserManagement() {
           accent="violet"
           icon="/Images/UserManagement/Total_Users.png"
           isActive={selectedStatFilter === "all"}
-          onClick={() => dispatch(setSelectedUserStatFilter("all"))}
+          onClick={() => handleStatCardClick("all")}
         />
         <UserStatCard
           label="Active Users"
@@ -304,13 +287,7 @@ export default function UserManagement() {
           accent="green"
           icon="/Images/UserManagement/Active_Users.png"
           isActive={selectedStatFilter === "active"}
-          onClick={() =>
-            dispatch(
-              setSelectedUserStatFilter(
-                selectedStatFilter === "active" ? "all" : "active",
-              ),
-            )
-          }
+          onClick={() => handleStatCardClick("active")}
         />
         <UserStatCard
           label="Inactive Users"
@@ -318,15 +295,24 @@ export default function UserManagement() {
           accent="slate"
           icon="/Images/UserManagement/Inactive_Users.png"
           isActive={selectedStatFilter === "inactive"}
-          onClick={() =>
-            dispatch(
-              setSelectedUserStatFilter(
-                selectedStatFilter === "inactive" ? "all" : "inactive",
-              ),
-            )
-          }
+          onClick={() => handleStatCardClick("inactive")}
         />
       </div>
+
+      {error && items.length === 0 && !passwordUser ? (
+        <div className="rounded-[12px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <span>{error}</span>
+            <button
+              type="button"
+              onClick={() => void refetchUsers()}
+              className="rounded-[8px] border border-rose-300 px-3 py-2 font-semibold text-rose-700 transition hover:bg-rose-100"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       <div className="shadow-sm">
         <DataTable
@@ -343,15 +329,27 @@ export default function UserManagement() {
           }}
           onSort={(key) => {
             setSortState((current) => {
-              if (current?.key !== key) {
-                return { key, direction: "ASC" };
-              }
+              const nextSortState =
+                current?.key !== key
+                  ? { key, direction: "ASC" as const }
+                  : current.direction === "ASC"
+                    ? { key, direction: "DESC" as const }
+                    : null;
 
-              if (current.direction === "ASC") {
-                return { key, direction: "DESC" };
-              }
+              dispatch(
+                setUserSorting(
+                  nextSortState
+                    ? [
+                        {
+                          field: nextSortState.key,
+                          direction: nextSortState.direction,
+                        },
+                      ]
+                    : [],
+                ),
+              );
 
-              return null;
+              return nextSortState;
             });
             setPage(1);
           }}
@@ -362,13 +360,13 @@ export default function UserManagement() {
         <UserStatusConfirmModal
           user={statusAction.user}
           nextStatus={statusAction.nextStatus}
+          loading={loading}
           onClose={() => setStatusAction(null)}
           onConfirm={async () => {
             const result = await dispatch(
               updateUserStatus({
                 id: statusAction.user.id,
                 status: statusAction.nextStatus,
-                userName: authUser?.profile?.username ?? "Admin",
               }),
             );
 
@@ -383,47 +381,35 @@ export default function UserManagement() {
       {passwordUser ? (
         <UserPasswordModal
           user={passwordUser}
-          onClose={() => setPasswordUser(null)}
-          onSubmit={async (password) => {
-            const result = await dispatch(
-              updateUserPassword({
-                id: passwordUser.id,
-                password,
-                userName: authUser?.profile?.username ?? "Admin",
-              }),
-            );
-
-            if (updateUserPassword.fulfilled.match(result)) {
-              await refetchUsers();
-              setPasswordUser(null);
-              setShowPasswordSuccess(true);
-            }
+          loading={passwordResetLoading}
+          message={passwordResetMessage}
+          error={passwordResetError}
+          onClose={() => {
+            setPasswordUser(null);
+            setPasswordResetMessage(null);
+            setPasswordResetError(null);
+            dispatch(clearUserMessages());
           }}
-        />
-      ) : null}
-
-      {showPasswordSuccess ? (
-        <UserPasswordSuccessModal onClose={() => setShowPasswordSuccess(false)} />
-      ) : null}
-
-      {accessUser ? (
-        <UserAccessModal
-          user={accessUser}
-          locations={userLocationOptions}
-          onClose={() => setAccessUser(null)}
-          onSubmit={async (accessAssignments) => {
+          onSubmit={async () => {
             const result = await dispatch(
-              updateUserAccess({
-                id: accessUser.id,
-                accessAssignments,
-                userName: authUser?.profile?.username ?? "Admin",
+              resetUserPassword({
+                id: passwordUser.id,
               }),
             );
 
-            if (updateUserAccess.fulfilled.match(result)) {
-              await refetchUsers();
-              setAccessUser(null);
+            if (resetUserPassword.fulfilled.match(result)) {
+              setPasswordResetMessage(
+                result.payload ||
+                  "We've sent a password reset link to the user's registered email. Please ask them to check their inbox.",
+              );
+              setPasswordResetError(null);
+              return;
             }
+
+            setPasswordResetMessage(null);
+            setPasswordResetError(
+              result.payload ?? "Unable to send reset password link.",
+            );
           }}
         />
       ) : null}

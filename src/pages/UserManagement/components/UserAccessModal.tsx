@@ -4,13 +4,14 @@ import UserAccessCard from "./UserAccessCard";
 import type {
   ManagedUserRecord,
   UserAccessAssignment,
+  UserModuleOption,
   UserLocationOption,
 } from "@/types";
-import { userModuleOptions } from "../userManagementData";
 
 interface UserAccessModalProps {
   user: ManagedUserRecord;
   locations: UserLocationOption[];
+  modules: UserModuleOption[];
   onClose: () => void;
   onSubmit: (accessAssignments: UserAccessAssignment[]) => Promise<void>;
 }
@@ -18,12 +19,13 @@ interface UserAccessModalProps {
 export default function UserAccessModal({
   user,
   locations,
+  modules,
   onClose,
   onSubmit,
 }: UserAccessModalProps) {
   const buildAssignments = (): UserAccessAssignment[] =>
-    userModuleOptions.map((moduleOption) => {
-      const existingAssignment = user.accessAssignments?.find(
+    modules.map((moduleOption) => {
+      const existingAssignment = user.accessAssignments.find(
         (assignment) => assignment.moduleId === moduleOption.id,
       );
 
@@ -31,8 +33,8 @@ export default function UserAccessModal({
         existingAssignment ?? {
           moduleId: moduleOption.id,
           moduleName: moduleOption.name,
+          enabled: false,
           locationIds: [],
-          locationNames: [],
         }
       );
     });
@@ -58,7 +60,7 @@ export default function UserAccessModal({
 
   const handleSubmit = async () => {
     const validAssignments = assignments.filter(
-      (assignment) => assignment.locationIds.length > 0,
+      (assignment) => assignment.enabled && assignment.locationIds.length > 0,
     );
 
     if (!validAssignments.length) {

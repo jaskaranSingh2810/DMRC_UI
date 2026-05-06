@@ -28,14 +28,13 @@ export function normalizeUser(
 ): User {
   const sourceProfile = profile ?? null;
   const sourceModules = sourceProfile?.modules ?? ("modules" in data ? data.modules : []);
+  const sourcePermissions = profile?.permissions ?? [];
   const modules: UserModule[] = sourceModules.map((moduleItem) => ({
     ...moduleItem,
     moduleId: moduleItem.moduleId ?? moduleItem.id,
     moduleName: moduleItem.moduleName ?? moduleItem.name,
   }));
-  const permissions = modules.flatMap((moduleItem) =>
-    moduleItem.permissions.map((permission) => permission.name)
-  );
+  const permissions = sourcePermissions.map((moduleItem) => moduleItem.name );
 
   return {
     accessToken: data.accessToken ?? null,

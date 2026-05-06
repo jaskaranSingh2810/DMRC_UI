@@ -69,6 +69,7 @@ export default function AddDeviceModal({
   const dispatch = useAppDispatch();
   const toast = useToast();
   const { loading, successMessage } = useAppSelector((state) => state.devices);
+  const { user } = useAppSelector((state) => state.auth);  
   const { items: locationList, listLoaded: locationListLoaded } =
     useAppSelector((state) => state.locations);
   const [step, setStep] = useState<"form" | "confirm">("form");
@@ -239,7 +240,7 @@ export default function AddDeviceModal({
     const result = await dispatch(
       createDevice({
         ...payload,
-        userName: "Jaskaran Singh",
+        userName: user?.profile?.username ?? "SYSTEM",
       }),
     );
 
@@ -271,7 +272,7 @@ export default function AddDeviceModal({
             <button
               type="button"
               onClick={() => setStep("form")}
-              className="rounded-xl border border-slate-300 px-4 py-3 font-semibold text-slate-700 transition hover:bg-slate-50"
+              className="rounded-xl border border-slate-300 px-4 py-3 font-semibold text-[#333333] transition hover:bg-slate-50"
             >
               Cancel
             </button>
@@ -497,7 +498,7 @@ export default function AddDeviceModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-[8px] border border-[#333333] px-4 py-3 font-semibold text-slate-700 transition hover:bg-slate-50"
+            className="rounded-[8px] border border-[#333333] px-4 py-3 font-semibold text-[#333333] transition hover:bg-slate-50"
           >
             Cancel
           </button>
@@ -526,7 +527,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 
   return (
     <label className="block">
-      <span className="mb-2 block text-[14px] font-400 text-slate-700">
+      <span className="mb-2 block text-[14px] font-400 text-[#333333]">
         {labelText}
         {isRequired ? <span className="text-[#B4272A]">*</span> : null}
       </span>

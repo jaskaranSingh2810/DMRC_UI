@@ -139,7 +139,7 @@ function PasswordField({
 }) {
   return (
     <label className="block">
-      <span className="mb-2 block text-sm font-semibold text-slate-700">
+      <span className="mb-2 block text-sm font-semibold text-[#333333]">
         {label}
       </span>
       <div className="relative">
@@ -153,7 +153,7 @@ function PasswordField({
         <button
           type="button"
           onClick={onToggle}
-          className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+          className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-[#333333]"
           aria-label={visible ? "Hide password" : "Show password"}
         >
           {visible ? <EyeOff size={18} /> : <Eye size={18} />}

@@ -16,9 +16,9 @@ export default function UserStatCard({
   onClick,
 }: UserStatCardProps) {
   const accentStyles = {
-    violet: "border-[#A74DCD] bg-[#FAF5FF]",
-    green: "border-[#D3F2D7] bg-[#F3FFF4]",
-    slate: "border-[#E4E7EC] bg-white",
+    violet: "border-violet-100",
+    green: "border-emerald-100",
+    slate: "border-slate-200",
   } as const;
 
   return (

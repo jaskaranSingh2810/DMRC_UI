@@ -10,7 +10,7 @@ export default function DashboardLayout() {
     <div className="flex h-screen overflow-hidden">
       <Sidebar isOpen={isOpen} setIsOpen={setIsOpen} />
       <div className="flex flex-1 flex-col overflow-hidden">
-        <Header toggleSidebar={() => setIsOpen(true)} />
+        <Header toggleSidebar={() => setIsOpen((current) => !current)} />
         
         <main className="flex-1 overflow-y-auto bg-dashboardBg p-4 md:p-6">
           <Outlet />

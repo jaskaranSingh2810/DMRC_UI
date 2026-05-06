@@ -11,7 +11,7 @@ export default function Toaster() {
   }
 
   return (
-    <div className="pointer-events-none fixed bottom-4 right-4 z-[120] flex w-[calc(100%-2rem)] max-w-sm flex-col gap-3">
+    <div className="pointer-events-none fixed top-4 left-1/2 z-[120] flex w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 flex-col gap-3">
       {toasts.map((toast) => (
         <div key={toast.id} className="pointer-events-auto">
           <Toast toast={toast} onClose={(id) => dispatch(removeToast(id))} />
