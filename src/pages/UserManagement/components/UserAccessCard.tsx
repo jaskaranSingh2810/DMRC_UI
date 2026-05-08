@@ -14,7 +14,10 @@ export default function UserAccessCard({
   onChange,
 }: UserAccessCardProps) {
   const [open, setOpen] = useState(false);
+
   const selectedLocationIds = assignment.locationIds;
+  const isUserManagementModule =
+    assignment.moduleName.trim().toLowerCase() === "user management";
   const allLocationIds = locations.map((location) => location.id);
   const isAllSelected =
     locations.length > 0 &&
@@ -79,9 +82,7 @@ export default function UserAccessCard({
     .sort((left, right) => left.name.localeCompare(right.name));
 
   return (
-    <div
-      className={`rounded-[8px] border border-[#D1D5DC] p-[12px] bg-white`}
-    >
+    <div className={`rounded-[8px] border border-[#D1D5DC] p-[12px] bg-white`}>
       <div className="flex justify-between gap-4 border-b border-[#E2E4EA] pb-3">
         <div className="flex gap-2">
           <input
@@ -100,15 +101,17 @@ export default function UserAccessCard({
         </div>
 
         <div className="relative">
-          <button
-            type="button"
-            onClick={() => setOpen((current) => !current)}
-            disabled={!assignment.enabled}
-            className="flex min-w-[160px] items-center justify-between rounded-[8px] border border-[#D0D5DD] px-3 py-2 text-[12px] font-medium text-[#333333] disabled:cursor-not-allowed disabled:bg-[#F0F0F0] disabled:text-[#A0A0A0]"
-          >
-            <span>Select Locations</span>
-            {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-          </button>
+          {!isUserManagementModule && (
+            <button
+              type="button"
+              onClick={() => setOpen((current) => !current)}
+              disabled={!assignment.enabled}
+              className="flex min-w-[160px] items-center justify-between rounded-[8px] border border-[#D0D5DD] px-3 py-2 text-[12px] font-medium text-[#333333] disabled:cursor-not-allowed disabled:bg-[#F0F0F0] disabled:text-[#A0A0A0]"
+            >
+              <span>Select Locations</span>
+              {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </button>
+          )}
 
           {open ? (
             <div className="absolute right-0 top-[calc(100%+8px)] z-20 min-w-[160px] rounded-[10px] border border-[#EAECF0] bg-white p-2 shadow-lg">
@@ -147,7 +150,9 @@ export default function UserAccessCard({
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
-        {assignment.enabled && selectedLocations.length ? (
+        {!isUserManagementModule &&
+        assignment.enabled &&
+        selectedLocations.length ? (
           selectedLocations.map((location) => (
             <span
               key={`${assignment.moduleId}-${location.id}`}
@@ -160,13 +165,15 @@ export default function UserAccessCard({
                 className="rounded-full text-[#FFFFFF] bg-[#5E1B7F] transition hover:bg-[#781ea5] p-[1px]"
                 aria-label={`Remove ${location.name}`}
               >
-                <span><X size={10}  strokeWidth={'3px'}/></span>
+                <span>
+                  <X size={10} strokeWidth={"3px"} />
+                </span>
               </button>
             </span>
           ))
         ) : (
-          <span className="text-[12px] text-[#98A2B3]">
-            No locations selected
+          <span className="text-[12px] text-[#333333] font-medium">
+            {isUserManagementModule ? "All Locations" : "No locations selected"}
           </span>
         )}
       </div>

@@ -325,10 +325,7 @@ const usersSlice = createSlice({
       })
       .addCase(fetchUserModules.fulfilled, (state, action) => {
         state.modulesLoading = false;
-        state.availableModules = action.payload.filter(
-          (moduleOption) =>
-            moduleOption.name.trim().toLowerCase() !== "user management",
-        );
+        state.availableModules = action.payload
       })
       .addCase(fetchUserModules.rejected, (state, action) => {
         state.modulesLoading = false;

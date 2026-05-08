@@ -1,10 +1,11 @@
 import type { ChangeEvent } from "react";
-import { Check, CheckCircle, CheckCircle2, Circle, Dot, Upload, Video, X } from "lucide-react";
+import { Check, CheckCircle2, Circle, Upload, Video, X } from "lucide-react";
 import type {
   CampaignMediaSlotState,
   CampaignMediaState,
   MediaMode,
 } from "./adCampaignWizardTypes";
+import { getOrientationLabel } from "./adCampaignWizardHelpers";
 
 interface Step1Props {
   campaign: CampaignMediaState;
@@ -90,6 +91,7 @@ export default function AdCampaignStepOne({
               key={media.id}
               media={media}
               multiple={campaign.mediaMode === "CUSTOM"}
+              required={campaign.mediaMode === "CUSTOM" ? 2 : 1}
               onUpload={(event) => onMediaUpload(media.id, event)}
               onRemove={() => onRemoveMedia(media.id)}
             />
@@ -103,11 +105,13 @@ export default function AdCampaignStepOne({
 function MediaSlotCard({
   media,
   multiple,
+  required,
   onUpload,
   onRemove,
 }: {
   media: CampaignMediaSlotState;
   multiple: boolean;
+  required: number;
   onUpload: (event: ChangeEvent<HTMLInputElement>) => void;
   onRemove: () => void;
 }) {
@@ -121,7 +125,11 @@ function MediaSlotCard({
             {media.previewUrl ? (
               <video
                 src={media.previewUrl}
-                className="h-full w-full object-cover"
+                className={`h-full w-full ${
+                  media.orientation === "PORTRAIT"
+                    ? "object-contain bg-black"
+                    : "object-cover"
+                }`}
                 muted
               />
             ) : (
@@ -141,6 +149,11 @@ function MediaSlotCard({
                 <p className="mt-2 truncate text-[16px] font-medium text-[#333333]">
                   {media.fileName}
                 </p>
+                {multiple ? (
+                  <span className="mt-2 inline-flex rounded-full bg-[#F2EAF6] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-[#5E1B7F]">
+                    {getOrientationLabel(media.orientation)}
+                  </span>
+                ) : null}
               </div>
 
               <button
@@ -178,10 +191,18 @@ function MediaSlotCard({
           ? media.label
           : "Drag & drop your file here or click to browse, Upload Ad (Auto-fit)"}
       </span>
+      {multiple ? (
+        <span className="mt-2 text-[12px] font-medium text-[#5E1B7F]">
+          {media.id === "primary" ? "Portrait media required" : "Landscape media required"}
+        </span>
+      ) : null}
       <span className="mt-2 max-w-[440px] text-xs leading-5 text-[#6A7282]">
         {multiple
           ? "Media Guidelines: Duration 5-40 sec | Max size 50 MB | MP4, MOV supported"
           : "Upload one file. We'll automatically adapt it to all supported screen formats. Media Guidelines: Duration 5-40 sec | Max size 50 MB | MP4, MOV supported"}
+      </span>
+      <span className="mt-2 text-[11px] text-[#6A7282]">
+        Required: {required} file{required > 1 ? "s" : ""}
       </span>
       <input
         id={inputId}

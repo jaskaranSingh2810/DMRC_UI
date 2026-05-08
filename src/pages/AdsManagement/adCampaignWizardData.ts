@@ -1,6 +1,7 @@
 import type {
   CampaignMediaState,
   CampaignWizardState,
+  MediaOrientation,
   MediaMode,
   LocationOption,
   ScheduleEntry,
@@ -171,6 +172,7 @@ export function createInitialWizardState(
               sizeLabel: "2.4 mb",
               durationSeconds: 30,
               status: "uploaded",
+              orientation: "LANDSCAPE",
             },
           ],
         }
@@ -200,12 +202,16 @@ export function mapDraftMediaToSlots(
     filePath: string;
     fileSize: number;
     duration: number;
+    orientation?: MediaOrientation;
   }>,
   buildPreviewUrl: (filePath: string) => string,
 ) {
-  return media.map((item, index) => ({
+  const mappedSlots = media.map((item, index) => ({
     ...(index === 0
-      ? createEmptyMediaSlot("primary", media.length > 1 ? "Upload Portrait Ad" : "Upload Media")
+      ? createEmptyMediaSlot(
+          "primary",
+          media.length > 1 ? "Upload Portrait Ad" : "Upload Media",
+        )
       : createEmptyMediaSlot("secondary", "Upload Landscape Ad")),
     previewUrl: buildPreviewUrl(item.filePath),
     fileName: item.fileName,
@@ -213,5 +219,24 @@ export function mapDraftMediaToSlots(
     durationSeconds: item.duration,
     status: "uploaded" as const,
     remoteFilePath: item.filePath,
+    orientation: item.orientation ?? "UNKNOWN",
   }));
+
+  return media.length > 1
+    ? mappedSlots.sort((left, right) => {
+        if (left.orientation === right.orientation) {
+          return 0;
+        }
+
+        if (left.orientation === "PORTRAIT") {
+          return -1;
+        }
+
+        if (right.orientation === "PORTRAIT") {
+          return 1;
+        }
+
+        return 0;
+      })
+    : mappedSlots;
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useReducer, useState } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -10,9 +10,12 @@ import {
   ChevronRight,
   Clock3,
   FileText,
+  LampDesk,
   MapPin,
   Monitor,
   MoveRight,
+  Search,
+  Video,
 } from "lucide-react";
 import { useToast } from "@/hooks/useToast";
 import AdCampaignStepOne from "./AdCampaignStepOne";
@@ -28,6 +31,7 @@ import {
   createEmptyMediaSlot,
   buildMediaPreviewUrl,
   formatBytes,
+  getOrientationLabel,
   getStepOneValidationMessage,
   getUploadedMedia,
   isStepOneReady,
@@ -56,6 +60,7 @@ type WizardAction =
         fileName: string;
         sizeLabel: string;
         durationSeconds: number;
+        orientation: "PORTRAIT" | "LANDSCAPE" | "UNKNOWN";
       };
     }
   | { type: "REMOVE_MEDIA_SLOT"; payload: { slotId: string } }
@@ -134,6 +139,7 @@ function wizardReducer(
                   durationSeconds: action.payload.durationSeconds,
                   status: action.payload.file ? "uploaded" : "empty",
                   remoteFilePath: null,
+                  orientation: action.payload.orientation,
                 }
               : media,
           ),
@@ -310,11 +316,11 @@ function isStepThreeValid(state: CampaignWizardState) {
 
     return Boolean(
       schedule &&
-        schedule.targetPlays > 0 &&
-        schedule.startDate &&
-        schedule.endDate &&
-        schedule.startTime &&
-        schedule.endTime,
+      schedule.targetPlays > 0 &&
+      schedule.startDate &&
+      schedule.endDate &&
+      schedule.startTime &&
+      schedule.endTime,
     );
   });
 }
@@ -332,12 +338,12 @@ function isStepValid(step: WizardStep, state: CampaignWizardState) {
     return isStepThreeValid(state);
   }
 
-  return isStepOneValid(state) && isStepTwoValid(state) && isStepThreeValid(state);
+  return (
+    isStepOneValid(state) && isStepTwoValid(state) && isStepThreeValid(state)
+  );
 }
 
-export default function AdCampaignWizard({
-  initialAd,
-}: AdCampaignWizardProps) {
+export default function AdCampaignWizard({ initialAd }: AdCampaignWizardProps) {
   const appDispatch = useAppDispatch();
   const navigate = useNavigate();
   const toast = useToast();
@@ -350,6 +356,7 @@ export default function AdCampaignWizard({
   const [expandedLocationId, setExpandedLocationId] = useState<string | null>(
     Object.keys(state.locations.selectedDevices)[0] ?? null,
   );
+  const uploadedMediaRef = useRef(state.campaign.uploadedMedia);
 
   useEffect(() => {
     dispatch({ type: "SYNC_SCHEDULE" });
@@ -364,7 +371,7 @@ export default function AdCampaignWizard({
     }
 
     if (
-      !expandedLocationId ||
+      expandedLocationId !== null &&
       !state.locations.selectedDevices[expandedLocationId]
     ) {
       setExpandedLocationId(selectedLocationIds[0]);
@@ -372,14 +379,18 @@ export default function AdCampaignWizard({
   }, [expandedLocationId, state.locations.selectedDevices]);
 
   useEffect(() => {
+    uploadedMediaRef.current = state.campaign.uploadedMedia;
+  }, [state.campaign.uploadedMedia]);
+
+  useEffect(() => {
     return () => {
-      state.campaign.uploadedMedia.forEach((media) => {
+      uploadedMediaRef.current.forEach((media) => {
         if (media.previewUrl.startsWith("blob:")) {
           URL.revokeObjectURL(media.previewUrl);
         }
       });
     };
-  }, [state.campaign.uploadedMedia]);
+  }, []);
 
   useEffect(() => {
     const contentId = initialAd?.contentId;
@@ -408,7 +419,9 @@ export default function AdCampaignWizard({
       .finally(() => {
         setDraftLoading(false);
       });
-  }, [appDispatch, initialAd?.contentId, toast]);
+    // Intentionally keyed only to the route-provided draft id.
+    // Refetch after save is handled explicitly in handleSaveDraft.
+  }, [appDispatch, initialAd?.contentId]);
 
   const selectedLocationIds = Object.keys(state.locations.selectedDevices);
   const selectedLocations = useMemo(
@@ -467,7 +480,7 @@ export default function AdCampaignWizard({
       URL.revokeObjectURL(previousMedia.previewUrl);
     }
 
-    const durationSeconds = await getVideoDuration(file);
+    const metadata = await getVideoMetadata(file);
 
     dispatch({
       type: "SET_MEDIA_SLOT",
@@ -477,7 +490,8 @@ export default function AdCampaignWizard({
         previewUrl: URL.createObjectURL(file),
         fileName: file.name,
         sizeLabel: formatBytes(file),
-        durationSeconds,
+        durationSeconds: metadata.durationSeconds,
+        orientation: metadata.orientation,
       },
     });
 
@@ -524,9 +538,14 @@ export default function AdCampaignWizard({
     setDraftSaving(true);
 
     try {
-      const draft = await appDispatch(saveAdDraft(state.campaign)).unwrap();
-      dispatch({ type: "HYDRATE_DRAFT", payload: draft });
-      dispatch({ type: "SET_CONTENT_ID", payload: draft.contentId });
+      const savedDraft = await appDispatch(
+        saveAdDraft(state.campaign),
+      ).unwrap();
+      dispatch({ type: "SET_CONTENT_ID", payload: savedDraft.contentId });
+      const hydratedDraft = await appDispatch(
+        fetchAdContent(savedDraft.contentId),
+      ).unwrap();
+      dispatch({ type: "HYDRATE_DRAFT", payload: hydratedDraft });
       toast.success("Content upload successfully", "Ad");
     } catch (error) {
       toast.error(
@@ -572,7 +591,9 @@ export default function AdCampaignWizard({
             currentStep={4}
             isEditMode={state.isEditMode}
             canReachStep={canReachStep}
-            onStepClick={(step) => dispatch({ type: "SET_STEP", payload: step })}
+            onStepClick={(step) =>
+              dispatch({ type: "SET_STEP", payload: step })
+            }
           />
           <div className="flex min-h-[420px] flex-col items-center justify-center text-center">
             <div className="flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg shadow-emerald-200">
@@ -610,7 +631,7 @@ export default function AdCampaignWizard({
           }}
         />
 
-        <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_400px]">
           <div className="min-w-0 space-y-6 rounded-[18px] border border-[#E8E1EE] bg-white p-4 shadow-sm sm:p-5">
             {state.step === 1 ? (
               <AdCampaignStepOne
@@ -681,7 +702,7 @@ export default function AdCampaignWizard({
             ) : null}
           </div>
           <div className="order-last lg:order-none">
-            <div className="lg:sticky lg:top-6">
+            <div className="lg:top-6">
               {state.step === 1 ? (
                 <InventoryForecastPanel
                   selectedLocations={selectedLocations}
@@ -702,7 +723,6 @@ export default function AdCampaignWizard({
               )}
             </div>
           </div>
-
         </div>
       </div>
     </WizardShell>
@@ -727,7 +747,9 @@ function WizardShell({
       <div className="flex flex-wrap items-center gap-2 text-sm text-[#333333]">
         <span className="text-[24px] font-[400]">Ad Management</span>
         <ChevronRight className="h-6 w-6" />
-        <span className="font-semibold text-[#333333] text-[24px]">Create New Ad</span>
+        <span className="font-semibold text-[#333333] text-[24px]">
+          Create New Ad
+        </span>
         {state.isEditMode ? (
           <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-semibold text-violet-700">
             Edit mode
@@ -736,29 +758,6 @@ function WizardShell({
       </div>
 
       {children}
-
-      {/* {state.step === 4 && !state.published ? null : (
-        <div className="hidden rounded-[24px] border border-slate-200 bg-white px-6 py-4 text-sm text-[#333333] xl:flex xl:items-center xl:justify-between">
-          <div>
-            <span className="font-semibold text-[#333333]">
-              {selectedLocations.length}
-            </span>{" "}
-            locations selected with{" "}
-            <span className="font-semibold text-[#333333]">
-              {totalSelectedDevices}
-            </span>{" "}
-            screens configured.
-          </div>
-          <button
-            type="button"
-            onClick={onBack}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 font-medium text-[#333333] transition hover:bg-slate-50"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back
-          </button>
-        </div>
-      )} */}
     </div>
   );
 }
@@ -783,7 +782,10 @@ export function StepIndicator({
           const isEnabled = isEditMode || canReachStep(step.id);
 
           return (
-            <div key={step.id} className="flex items-center gap-2 md:gap-3 w-full">
+            <div
+              key={step.id}
+              className="flex items-center gap-2 md:gap-3 w-full"
+            >
               <button
                 type="button"
                 onClick={() => onStepClick(step.id)}
@@ -807,7 +809,9 @@ export function StepIndicator({
                 >
                   {isCompleted ? <Check className="h-4 w-4" /> : step.id}
                 </span>
-                <span className="text-[14px] text-[#333333] font-medium lg:text-nowrap text-wrap">{step.label}</span>
+                <span className="text-[14px] text-[#333333] font-medium lg:text-nowrap text-wrap">
+                  {step.label}
+                </span>
               </button>
 
               {index < WIZARD_STEPS.length - 1 ? (
@@ -826,7 +830,9 @@ export function CampaignMediaPreview({
 }: {
   campaign: CampaignWizardState["campaign"];
 }) {
-  const primaryMedia = getUploadedMedia(campaign)[0] ?? campaign.uploadedMedia[0];
+  const uploadedMedia = getUploadedMedia(campaign);
+
+  console.log(uploadedMedia);
 
   return (
     <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
@@ -835,44 +841,67 @@ export function CampaignMediaPreview({
         <span>Campaign Media</span>
       </div>
 
-      <div className="mt-4 rounded-2xl border border-slate-200 p-3">
-        <div className="flex flex-col gap-4 sm:flex-row">
-          <div className="h-24 w-full overflow-hidden rounded-xl bg-gradient-to-br from-[#7b1fa2] via-[#1a56db] to-[#0f172a] sm:w-36">
-            {primaryMedia?.previewUrl ? (
-              <video
-                src={primaryMedia.previewUrl}
-                className="h-full w-full object-cover"
-                muted
-              />
-            ) : (
-              <div className="flex h-full items-center justify-center text-sm font-semibold text-white/90">
-                Media
-              </div>
-            )}
-          </div>
+      <div className="mt-4 space-y-3">
+        {uploadedMedia.length ? (
+          uploadedMedia.map((media, index) => (
+            <div
+              key={`${media.fileName}-${index}`}
+              className="rounded-2xl border border-slate-200 p-3"
+            >
+              <div className="flex flex-col gap-4 sm:flex-row">
+                <div className="h-16 w-full overflow-hidden rounded-xl bg-black sm:w-24">
+                  {media.previewUrl ? (
+                    <video
+                      src={media.previewUrl}
+                      className={`h-full w-full ${
+                        media.orientation === "PORTRAIT"
+                          ? "object-contain bg-black"
+                          : "object-cover"
+                      }`}
+                      muted
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-sm font-semibold text-white/90">
+                      Media
+                    </div>
+                  )}
+                </div>
 
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-lg font-semibold text-[#333333]">
-              {campaign.name || "Untitled campaign"}
-            </p>
-            <p className="mt-1 truncate text-sm text-[#333333]">
-              {getUploadedMedia(campaign).map((item) => item.fileName).join(", ") ||
-                "No media uploaded yet"}
-            </p>
-            <div className="mt-3 flex flex-wrap gap-4 text-sm text-[#333333]">
-              <span className="inline-flex items-center gap-1">
-                <Clock3 className="h-4 w-4" />
-                {primaryMedia?.durationSeconds ?? 0} seconds
-              </span>
-              {primaryMedia?.sizeLabel ? (
-                <span className="inline-flex items-center gap-1">
-                  <FileText className="h-4 w-4" />
-                  {primaryMedia.sizeLabel}
-                </span>
-              ) : null}
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="truncate text-sm font-semibold text-[#333333]">
+                      {campaign.name || "Untitled campaign"}
+                    </p>
+                    {campaign.mediaMode === "CUSTOM" ? (
+                      <span className="rounded-full bg-[#F2EAF6] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#5E1B7F]">
+                        {getOrientationLabel(media.orientation)}
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="mt-1 truncate text-xs text-[#333333]">
+                    {media.fileName || "No media uploaded yet"}
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-4 text-xs text-[#333333]">
+                    <span className="inline-flex items-center gap-1">
+                      <Video className="h-3.5 w-3.5" />
+                      {media.durationSeconds?.toPrecision(3)} seconds
+                    </span>
+                    {media.sizeLabel ? (
+                      <span className="inline-flex items-center gap-1">
+                        <FileText className="h-3.5 w-3.5" />
+                        {media.sizeLabel}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
             </div>
+          ))
+        ) : (
+          <div className="rounded-2xl border border-slate-200 p-3 text-sm text-[#333333]">
+            No media uploaded yet
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
@@ -897,7 +926,7 @@ export function InventoryForecastPanel({
           <h3>Inventory Forecast</h3>
         </div>
         <div className="flex min-h-[260px] flex-col items-center justify-center text-center text-[#333333]">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 text-[#333333]">
             <BarChart3 className="h-8 w-8" />
           </div>
           <p className="mt-5 max-w-xs text-sm leading-6">
@@ -920,21 +949,30 @@ export function InventoryForecastPanel({
   const totalRequiredHours = Number((totalTargetPlays / 120).toFixed(2));
   const utilisationPercentage =
     totalCapacityHours > 0
-      ? Math.min(100, Number(((totalRequiredHours / totalCapacityHours) * 100).toFixed(1)))
+      ? Math.min(
+          100,
+          Number(((totalRequiredHours / totalCapacityHours) * 100).toFixed(1)),
+        )
       : 0;
 
   return (
     <div className="space-y-4 rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex items-center gap-2 text-[18px] font-semibold text-[#333333]">
         <BarChart3 className="h-5 w-5 text-violet-700" />
-        <span className="text-[18px] font-semibold text-[#333333]">Inventory Forecast</span>
+        <span className="text-[18px] font-semibold text-[#333333]">
+          Inventory Forecast
+        </span>
       </div>
 
       {selectedLocations.map((location) => {
         const selectedCount = selectedDevices[location.id]?.length ?? 0;
         const capacityHours = selectedCount * 315;
         const requiredHours = Number(
-          (((schedule[location.id]?.targetPlays ?? 100) * Math.max(selectedCount, 1)) / 1440).toFixed(2),
+          (
+            ((schedule[location.id]?.targetPlays ?? 100) *
+              Math.max(selectedCount, 1)) /
+            1440
+          ).toFixed(2),
         );
 
         return (
@@ -953,7 +991,12 @@ export function InventoryForecastPanel({
               <span className="text-sm font-semibold text-emerald-600">
                 {Math.min(
                   100,
-                  Number(((requiredHours / Math.max(capacityHours, 1)) * 100).toFixed(1)),
+                  Number(
+                    (
+                      (requiredHours / Math.max(capacityHours, 1)) *
+                      100
+                    ).toFixed(1),
+                  ),
                 )}
                 %
               </span>
@@ -965,7 +1008,12 @@ export function InventoryForecastPanel({
                 style={{
                   width: `${Math.min(
                     100,
-                    Number(((requiredHours / Math.max(capacityHours, 1)) * 100).toFixed(1)),
+                    Number(
+                      (
+                        (requiredHours / Math.max(capacityHours, 1)) *
+                        100
+                      ).toFixed(1),
+                    ),
                   )}%`,
                 }}
               />
@@ -976,12 +1024,18 @@ export function InventoryForecastPanel({
                 compact ? "grid-cols-2" : "grid-cols-2 xl:grid-cols-3"
               }`}
             >
-              <ForecastStat label="Capacity" value={`${capacityHours.toFixed(1)}h`} />
+              <ForecastStat
+                label="Capacity"
+                value={`${capacityHours.toFixed(1)}h`}
+              />
               <ForecastStat
                 label="Available"
                 value={`${Math.max(capacityHours - requiredHours, 0).toFixed(1)}h`}
               />
-              <ForecastStat label="Required" value={`${requiredHours.toFixed(2)}h`} />
+              <ForecastStat
+                label="Required"
+                value={`${requiredHours.toFixed(2)}h`}
+              />
               <ForecastStat
                 label="Campaign Days"
                 value={String(getCampaignDays(schedule[location.id]))}
@@ -1009,8 +1063,14 @@ export function InventoryForecastPanel({
         </div>
 
         <div className="mt-4 space-y-3 border-t border-slate-100 pt-4 text-sm text-slate-600">
-          <SummaryRow label="Total Screens" value={String(totalSelectedDevices)} />
-          <SummaryRow label="Total Target Plays" value={String(totalTargetPlays)} />
+          <SummaryRow
+            label="Total Screens"
+            value={String(totalSelectedDevices)}
+          />
+          <SummaryRow
+            label="Total Target Plays"
+            value={String(totalTargetPlays)}
+          />
           <SummaryRow
             label="Total Required Time"
             value={`${totalRequiredHours.toFixed(2)}h`}
@@ -1029,7 +1089,7 @@ export function InventoryForecastPanel({
 function ForecastStat({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-xs uppercase tracking-wide text-slate-400">{label}</p>
+      <p className="text-xs uppercase tracking-wide text-[#333333]">{label}</p>
       <p className="mt-1 font-semibold text-slate-800">{value}</p>
     </div>
   );
@@ -1062,21 +1122,34 @@ export function Step2LocationScreens({
 }: {
   selectedDevices: Record<string, string[]>;
   expandedLocationId: string | null;
-  onExpandLocation: (locationId: string) => void;
+  onExpandLocation: (locationId: string | null) => void;
   onToggleLocation: (locationId: string) => void;
   onToggleDevice: (locationId: string, deviceId: string) => void;
   onToggleSelectAll: (locationId: string) => void;
 }) {
   const selectedLocationIds = Object.keys(selectedDevices);
+  const [searchTerm, setSearchTerm] = useState("");
 
   return (
     <section className="space-y-6">
-      <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="flex items-center gap-3">
-          <MapPin className="h-5 w-5 text-violet-700" />
-          <h2 className="text-2xl font-semibold text-[#333333]">
-            Location &amp; Screens
-          </h2>
+      <div>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center gap-3">
+            <h2 className="text-2xl font-semibold text-[#333333]">
+              Location &amp; Screens
+            </h2>
+          </div>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#333333]" />
+
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="Search"
+              className="h-10 w-full rounded-xl border border-[#9870AD] pl-10 pr-4 text-sm outline-none focus:ring-2 focus:ring-violet-100"
+            />
+          </div>
         </div>
 
         <div className="mt-6 flex flex-wrap gap-3">
@@ -1088,8 +1161,8 @@ export function Step2LocationScreens({
                 key={location.id}
                 className={`flex cursor-pointer items-center gap-3 rounded-2xl border px-4 py-3 text-sm font-medium transition ${
                   isSelected
-                    ? "border-violet-300 bg-violet-50 text-violet-800"
-                    : "border-slate-200 bg-white text-[#333333] hover:border-slate-300"
+                    ? "border-[#9870AD] bg-[#F2EAF6] text-[#5E1B7F]"
+                    : "border-[#D1D5DC] bg-white text-[#333333] hover:border-slate-300"
                 }`}
               >
                 <input
@@ -1102,10 +1175,15 @@ export function Step2LocationScreens({
                       onExpandLocation(location.id);
                     }
                   }}
-                  className="h-4 w-4 rounded border-slate-300 text-violet-700 focus:ring-violet-400"
+                  className="hidden h-4 w-4 rounded border-slate-300 text-violet-700 focus:ring-violet-400"
+                />
+                <MapPin
+                  className={`h-5 w-5 ${isSelected ? "text-violet-700" : "text-[#333333]"}`}
                 />
                 <span>{location.name}</span>
-                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-[#333333]">
+                <span
+                  className={`rounded-full ${isSelected ? "bg-white" : "bg-[#D1D5DC]"} px-2 py-1.5 text-xs font-semibold text-[#333333]`}
+                >
                   {location.devices.length}
                 </span>
               </label>
@@ -1120,32 +1198,39 @@ export function Step2LocationScreens({
             ).map((location) => {
               const isExpanded = expandedLocationId === location.id;
               const allSelected =
-                selectedDevices[location.id]?.length === location.devices.length;
+                selectedDevices[location.id]?.length ===
+                location.devices.length;
 
               return (
                 <div
                   key={location.id}
-                  className="rounded-[24px] border border-slate-200"
+                  className="rounded-[24px] border border-[#D1D5DC] bg-white"
                 >
                   <button
                     type="button"
-                    onClick={() => onExpandLocation(location.id)}
+                    onClick={() =>
+                      onExpandLocation(isExpanded ? null : location.id)
+                    }
                     className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left"
                   >
-                    <div>
-                      <p className="text-lg font-semibold text-[#333333]">
-                        {location.name}
-                      </p>
-                      <p className="text-sm text-[#333333]">
-                        {location.devices.length} Screens
-                      </p>
+                    <div className="flex gap-2 items-center">
+                      <Monitor className="h-5 w-5 text-[#333333]" />
+                      <div>
+                        <p className="text-[14px] font-medium text-[#333333]">
+                          {location.name}
+                        </p>
+                        <p className="text-[12px] text-[#566272]">
+                          {location.devices.length} Screens
+                        </p>
+                      </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className="rounded-full bg-violet-700 px-3 py-1 text-sm font-semibold text-white">
-                        {selectedDevices[location.id]?.length}/{location.devices.length} Selected
+                      <span className="rounded-full bg-[#5E1B7F] px-3 py-1 text-[14px] font-medium text-white">
+                        {selectedDevices[location.id]?.length}/
+                        {location.devices.length} Selected
                       </span>
                       <ChevronDown
-                        className={`h-5 w-5 text-slate-400 transition ${
+                        className={`h-5 w-5 text-[#333333] transition ${
                           isExpanded ? "rotate-180" : ""
                         }`}
                       />
@@ -1159,32 +1244,32 @@ export function Step2LocationScreens({
                           type="checkbox"
                           checked={allSelected}
                           onChange={() => onToggleSelectAll(location.id)}
-                          className="h-4 w-4 rounded border-slate-300 text-violet-700 focus:ring-violet-400"
+                          className="h-4 w-4 rounded-sm  accent-[#5E1B7F] p-2 focus:ring-[#5E1B7F]"
                         />
                         Select all
                       </label>
 
-                      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                        {location.devices.map((device) => (
-                          <label
-                            key={device.id}
-                            className={`flex cursor-pointer items-center gap-3 rounded-2xl border px-4 py-3 text-sm transition ${
-                              selectedDevices[location.id]?.includes(device.id)
-                                ? "border-violet-300 bg-violet-50"
-                                : "border-slate-200"
-                            }`}
-                          >
-                            <input
-                              aria-label={`Select ${device.name}`}
-                              type="checkbox"
-                              checked={selectedDevices[location.id]?.includes(device.id)}
-                              onChange={() => onToggleDevice(location.id, device.id)}
-                              className="h-4 w-4 rounded border-slate-300 text-violet-700 focus:ring-violet-400"
-                            />
-                            <span className="truncate">{device.name}</span>
-                          </label>
-                        ))}
-                      </div>
+                      <ScreenSection
+                        title="Portrait Screens"
+                        devices={location.devices.filter(
+                          (device, index) => index % 2 === 0,
+                        )}
+                        locationId={location.id}
+                        searchTerm={searchTerm}
+                        selectedDevices={selectedDevices}
+                        onToggleDevice={onToggleDevice}
+                      />
+                      <hr className="w-full lg:mt-8 md:mt-6 mt-4 h-2 text-[#E2E4EA]"></hr>
+                      <ScreenSection
+                        title="Landscape Screens"
+                        devices={location.devices.filter(
+                          (device, index) => index % 2 !== 0,
+                        )}
+                        locationId={location.id}
+                        searchTerm={searchTerm}
+                        selectedDevices={selectedDevices}
+                        onToggleDevice={onToggleDevice}
+                      />
                     </div>
                   ) : null}
                 </div>
@@ -1224,7 +1309,10 @@ export function Step3ScheduleTarget({
       return;
     }
 
-    if (!openLocationId || !selectedLocations.some((item) => item.id === openLocationId)) {
+    if (
+      !openLocationId ||
+      !selectedLocations.some((item) => item.id === openLocationId)
+    ) {
       setOpenLocationId(selectedLocations[0].id);
     }
   }, [openLocationId, selectedLocations]);
@@ -1245,7 +1333,10 @@ export function Step3ScheduleTarget({
             const isOpen = openLocationId === location.id;
 
             return (
-              <div key={location.id} className="rounded-[24px] border border-slate-200">
+              <div
+                key={location.id}
+                className="rounded-[24px] border border-slate-200"
+              >
                 <button
                   type="button"
                   onClick={() => setOpenLocationId(isOpen ? null : location.id)}
@@ -1264,7 +1355,7 @@ export function Step3ScheduleTarget({
                   </div>
 
                   <ChevronDown
-                    className={`h-5 w-5 text-slate-400 transition ${
+                    className={`h-5 w-5 text-[#333333] transition ${
                       isOpen ? "rotate-180" : ""
                     }`}
                   />
@@ -1331,7 +1422,11 @@ export function Step3ScheduleTarget({
                           type="date"
                           value={entry.startDate}
                           onChange={(event) =>
-                            onScheduleChange(location.id, "startDate", event.target.value)
+                            onScheduleChange(
+                              location.id,
+                              "startDate",
+                              event.target.value,
+                            )
                           }
                           className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
                         />
@@ -1349,7 +1444,11 @@ export function Step3ScheduleTarget({
                           type="time"
                           value={entry.startTime}
                           onChange={(event) =>
-                            onScheduleChange(location.id, "startTime", event.target.value)
+                            onScheduleChange(
+                              location.id,
+                              "startTime",
+                              event.target.value,
+                            )
                           }
                           className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
                         />
@@ -1367,7 +1466,11 @@ export function Step3ScheduleTarget({
                           type="date"
                           value={entry.endDate}
                           onChange={(event) =>
-                            onScheduleChange(location.id, "endDate", event.target.value)
+                            onScheduleChange(
+                              location.id,
+                              "endDate",
+                              event.target.value,
+                            )
                           }
                           className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
                         />
@@ -1385,7 +1488,11 @@ export function Step3ScheduleTarget({
                           type="time"
                           value={entry.endTime}
                           onChange={(event) =>
-                            onScheduleChange(location.id, "endTime", event.target.value)
+                            onScheduleChange(
+                              location.id,
+                              "endTime",
+                              event.target.value,
+                            )
                           }
                           className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
                         />
@@ -1422,6 +1529,88 @@ function Field({ children }: { children: React.ReactNode }) {
   return <div>{children}</div>;
 }
 
+function ScreenSection({
+  title,
+  devices,
+  locationId,
+  searchTerm,
+  selectedDevices,
+  onToggleDevice,
+}: {
+  title: string;
+  devices: (typeof LOCATION_OPTIONS)[number]["devices"];
+  locationId: string;
+  searchTerm: string;
+  selectedDevices: Record<string, string[]>;
+  onToggleDevice: (locationId: string, deviceId: string) => void;
+}) {
+  const filteredDevices = devices.filter((device) =>
+    device.name.toLowerCase().includes(searchTerm.toLowerCase().trim()),
+  );
+
+  if (!filteredDevices.length) {
+    return null;
+  }
+
+  return (
+    <div className="mt-6">
+      <div className="mb-3 flex items-center justify-between">
+        <p className="text-sm font-semibold text-[#333333]">{title}</p>
+        <div className="flex items-center gap-3 text-xs text-[#333333]">
+          <span className="inline-flex items-center gap-1">
+            <span className="h-3 w-3 rounded-sm bg-[#3EAF3F] border border-[#3EAF3F]" />
+            Working
+          </span>
+          <hr className="h-3 w-px bg-[#D1D5DC]" />
+          <span className="inline-flex items-center gap-1">
+            <span className="h-3 w-3 rounded-sm bg-[#B4272A] border border-[#B4272A]" />
+            Not Working
+          </span>
+        </div>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {filteredDevices.map((device, index) => {
+          const isSelected = selectedDevices[locationId]?.includes(device.id);
+          const isWorking = index % 2 !== 1;
+
+          return (
+            <label
+              key={device.id}
+              className={`flex cursor-pointer flex-col gap-3 rounded-2xl border p-3 text-sm transition ${
+                isWorking
+                  ? "border-[#3EAF3F] bg-[#3EAF3F1A]"
+                  : "border-[#B4272A] bg-[#B4272A1A]"
+              } ${isSelected ? "ring-2 ring-[#5E1B7F1F]" : ""}`}
+            >
+              <div className="flex items-center gap-2">
+                <input
+                  aria-label={`Select ${device.name}`}
+                  type="checkbox"
+                  checked={isSelected}
+                  onChange={() => onToggleDevice(locationId, device.id)}
+                  className="h-4 w-4 rounded-sm  accent-[#5E1B7F] p-2 focus:ring-[#5E1B7F]"
+                />
+                <span className="truncate font-medium text-[#333333]">
+                  {device.name.split("_")[0].toLowerCase()}
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-2 text-[11px] text-[#6A7282]">
+                <span className="rounded-full bg-white px-2 py-1">Samsung</span>
+                <span className="rounded-full bg-white px-2 py-1">
+                  {device.name.match(/\d+\s*inch/i)?.[0] ?? "70 inch"}
+                </span>
+              </div>
+              <span className="rounded-full bg-white px-2 py-1 text-center text-[11px] text-[#6A7282]">
+                Pillar 24
+              </span>
+            </label>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export function Step4Submit({
   state,
   selectedLocations,
@@ -1449,7 +1638,10 @@ export function Step4Submit({
                 Campaign Summary
               </h3>
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                <SummaryCard label="Campaign Name" value={state.campaign.name} />
+                <SummaryCard
+                  label="Campaign Name"
+                  value={state.campaign.name}
+                />
                 <SummaryCard
                   label="Uploaded Media"
                   value={
@@ -1476,13 +1668,17 @@ export function Step4Submit({
                         {location.name}
                       </p>
                       <span className="rounded-full bg-violet-100 px-3 py-1 text-sm font-semibold text-violet-700">
-                        {state.locations.selectedDevices[location.id]?.length ?? 0} devices
+                        {state.locations.selectedDevices[location.id]?.length ??
+                          0}{" "}
+                        devices
                       </span>
                     </div>
                     <div className="mt-3 flex flex-wrap gap-2">
                       {location.devices
                         .filter((device) =>
-                          state.locations.selectedDevices[location.id]?.includes(device.id),
+                          state.locations.selectedDevices[
+                            location.id
+                          ]?.includes(device.id),
                         )
                         .map((device) => (
                           <span
@@ -1627,7 +1823,10 @@ function getCampaignDays(schedule?: ScheduleEntry) {
   return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
 }
 
-function getVideoDuration(file: File): Promise<number> {
+function getVideoMetadata(file: File): Promise<{
+  durationSeconds: number;
+  orientation: "PORTRAIT" | "LANDSCAPE" | "UNKNOWN";
+}> {
   return new Promise((resolve) => {
     const objectUrl = URL.createObjectURL(file);
     const video = document.createElement("video");
@@ -1640,16 +1839,22 @@ function getVideoDuration(file: File): Promise<number> {
 
     video.preload = "metadata";
     video.onloadedmetadata = () => {
-      const duration =
+      const durationSeconds =
         Number.isFinite(video.duration) && video.duration > 0
           ? Number(video.duration.toFixed(2))
           : 0;
+      const orientation =
+        video.videoWidth && video.videoHeight
+          ? video.videoHeight > video.videoWidth
+            ? "PORTRAIT"
+            : "LANDSCAPE"
+          : "UNKNOWN";
       cleanup();
-      resolve(duration);
+      resolve({ durationSeconds, orientation });
     };
     video.onerror = () => {
       cleanup();
-      resolve(0);
+      resolve({ durationSeconds: 0, orientation: "UNKNOWN" });
     };
     video.src = objectUrl;
   });

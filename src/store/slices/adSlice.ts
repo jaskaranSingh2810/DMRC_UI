@@ -71,13 +71,6 @@ interface RemoveAdRequest {
   userName: string;
 }
 
-const contentBaseUrl =
-  import.meta.env.VITE_CONTENT_API_URL ?? "http://localhost:8085";
-
-function getContentUrl(path: string) {
-  return `${contentBaseUrl}${path}`;
-}
-
 export const fetchAds = createAsyncThunk<
   PaginatedAds,
   AdListRequest | void,
@@ -138,7 +131,7 @@ export const saveAdDraft = createAsyncThunk<
   try {
     const response: AxiosResponse<ApiEnvelope<DraftContentResponse>> =
       await axiosInstance.post(
-        getContentUrl("/api/v1/dmrc/content/upload-ad-data"),
+        "/api/v1/dmrc/content/upload-ad-data",
         buildDraftUploadFormData(campaign),
         {
           headers: {
@@ -166,8 +159,7 @@ export const fetchAdContent = createAsyncThunk<
 >("ads/fetchContent", async (contentId, { rejectWithValue }) => {
   try {
     const response: AxiosResponse<ApiEnvelope<DraftContentResponse>> =
-      await axiosInstance.get(
-        getContentUrl(`/api/v1/dmrc/content/${contentId}`),
+      await axiosInstance.get(`/api/v1/dmrc/content/${contentId}`,
       );
 
     if (!isApiSuccess(response.data)) {
@@ -272,6 +264,5 @@ const adSlice = createSlice({
   },
 });
 
-export const { setAdFilter, clearAdMessages, clearAdFilters } =
-  adSlice.actions;
+export const { setAdFilter, clearAdMessages, clearAdFilters } = adSlice.actions;
 export default adSlice.reducer;

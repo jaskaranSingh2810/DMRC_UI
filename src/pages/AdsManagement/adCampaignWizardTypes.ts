@@ -3,6 +3,7 @@ import type { Ad } from "@/types";
 export type WizardStep = 1 | 2 | 3 | 4;
 export type MediaMode = "AUTO_FIT" | "CUSTOM";
 export type UploadStatus = "empty" | "uploaded";
+export type MediaOrientation = "PORTRAIT" | "LANDSCAPE" | "UNKNOWN";
 
 export interface DeviceOption {
   id: string;
@@ -25,6 +26,7 @@ export interface CampaignMediaSlotState {
   durationSeconds: number;
   status: UploadStatus;
   remoteFilePath: string | null;
+  orientation: MediaOrientation;
 }
 
 export interface CampaignMediaState {
@@ -66,6 +68,7 @@ export interface DraftMediaResponse {
   filePath: string;
   fileSize: number;
   duration: number;
+  orientation?: MediaOrientation;
 }
 
 export interface DraftContentResponse {

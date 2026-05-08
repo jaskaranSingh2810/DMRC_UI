@@ -1,6 +1,7 @@
 import type {
   CampaignMediaSlotState,
   CampaignMediaState,
+  MediaOrientation,
   MediaMode,
 } from "./adCampaignWizardTypes";
 
@@ -18,6 +19,7 @@ export function createEmptyMediaSlot(
     durationSeconds: 0,
     status: "empty",
     remoteFilePath: null,
+    orientation: "UNKNOWN",
   };
 }
 
@@ -36,12 +38,19 @@ export function getUploadedMedia(
   return campaign.uploadedMedia.filter((media) => Boolean(media.fileName));
 }
 
+export function getRequiredMediaCount(campaign: CampaignMediaState): number {
+  return campaign.mediaMode === "CUSTOM" ? 2 : 1;
+}
+
 export function getDraftMediaType(campaign: CampaignMediaState): MediaMode {
   return getUploadedMedia(campaign).length > 1 ? "CUSTOM" : "AUTO_FIT";
 }
 
 export function isStepOneReady(campaign: CampaignMediaState): boolean {
-  return Boolean(campaign.name.trim() && getUploadedMedia(campaign).length > 0);
+  return Boolean(
+    campaign.name.trim() &&
+      getUploadedMedia(campaign).length >= getRequiredMediaCount(campaign),
+  );
 }
 
 export function getStepOneValidationMessage(
@@ -51,8 +60,10 @@ export function getStepOneValidationMessage(
     return "Enter a campaign name to continue.";
   }
 
-  if (getUploadedMedia(campaign).length === 0) {
-    return "Upload at least one media file to continue.";
+  const requiredMediaCount = getRequiredMediaCount(campaign);
+
+  if (getUploadedMedia(campaign).length < requiredMediaCount) {
+    return `Upload ${requiredMediaCount} media file${requiredMediaCount > 1 ? "s" : ""} to continue.`;
   }
 
   return null;
@@ -85,6 +96,22 @@ export function buildDraftUploadFormData(campaign: CampaignMediaState): FormData
 export function buildMediaPreviewUrl(filePath: string): string {
   const contentBaseUrl =
     import.meta.env.VITE_CONTENT_API_URL ?? "http://localhost:8085";
+  const normalizedPath = filePath.replace(/\\/g, "/");
+  const pathWithLeadingSlash = normalizedPath.startsWith("/")
+    ? normalizedPath
+    : `/${normalizedPath}`;
 
-  return `${contentBaseUrl}${filePath.replace(/\\/g, "/")}`;
+  return `${contentBaseUrl}${pathWithLeadingSlash}`;
+}
+
+export function getOrientationLabel(orientation: MediaOrientation): string {
+  if (orientation === "PORTRAIT") {
+    return "Portrait";
+  }
+
+  if (orientation === "LANDSCAPE") {
+    return "Landscape";
+  }
+
+  return "Unknown";
 }
