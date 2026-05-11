@@ -280,6 +280,7 @@ export default function UserManagement() {
           icon="/Images/UserManagement/Total_Users.png"
           isActive={selectedStatFilter === "all"}
           onClick={() => handleStatCardClick("all")}
+          description="Includes all registered users regardless of their status."
         />
         <UserStatCard
           label="Active Users"
@@ -288,6 +289,7 @@ export default function UserManagement() {
           icon="/Images/UserManagement/Active_Users.png"
           isActive={selectedStatFilter === "active"}
           onClick={() => handleStatCardClick("active")}
+          description="Users who are currently active and have access to the system."
         />
         <UserStatCard
           label="Inactive Users"
@@ -296,6 +298,7 @@ export default function UserManagement() {
           icon="/Images/UserManagement/Inactive_Users.png"
           isActive={selectedStatFilter === "inactive"}
           onClick={() => handleStatCardClick("inactive")}
+          description="Users who are currently inactive and do not have access to the system."
         />
       </div>
 

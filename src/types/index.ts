@@ -109,6 +109,18 @@ export interface DeviceRecord {
   device?: string;
 }
 
+export interface DeviceResolutionHistoryRecord {
+  id?: string | number;
+  remarks: string;
+  resolvedBy: string;
+  resolvedDate: string;
+}
+
+export interface DeviceDetails {
+  device: DeviceRecord;
+  resolutionHistory: DeviceResolutionHistoryRecord[];
+}
+
 export interface DevicePayload {
   brand: string;
   model: string;

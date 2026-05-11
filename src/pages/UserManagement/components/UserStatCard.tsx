@@ -1,3 +1,6 @@
+import InfoTooltip from "@/components/ui/InfoTooltip";
+import { Info } from "lucide-react";
+
 interface UserStatCardProps {
   label: string;
   value: string;
@@ -5,6 +8,7 @@ interface UserStatCardProps {
   accent: "violet" | "green" | "slate";
   isActive: boolean;
   onClick: () => void;
+  description?: string;
 }
 
 export default function UserStatCard({
@@ -14,6 +18,7 @@ export default function UserStatCard({
   accent,
   isActive,
   onClick,
+  description,
 }: UserStatCardProps) {
   const accentStyles = {
     violet: "border-violet-100",
@@ -34,7 +39,12 @@ export default function UserStatCard({
       }`}
     >
       <div>
-        <p className="text-[15px] font-medium text-[#344054]">{label}</p>
+        <div className="flex gap-1 items-center">
+          <p className="text-[15px] font-medium text-[#344054]">{label}</p>
+          {description && (
+            <InfoTooltip description={description} />
+          )}
+        </div>
         <p className="mt-2 text-[30px] font-semibold leading-none text-[#101828]">
           {value}
         </p>

@@ -60,7 +60,6 @@ export interface ManagedUserFormPayload {
   password: string;
   roleId: number;
   roleName?: string;
-  departmentId?: number;
   accessAssignments: UserAccessAssignment[];
 }
 

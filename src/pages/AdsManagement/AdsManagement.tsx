@@ -21,6 +21,7 @@ import {
   setAdFilter,
 } from "@/store/slices/adSlice";
 import type { Ad } from "@/types";
+import InfoTooltip from "@/components/ui/InfoTooltip";
 
 type AdStatFilter = "all" | "live" | "expired";
 
@@ -344,6 +345,7 @@ export default function AdsManagement() {
           icon={'/Images/AdManagement/Total_Ads.png'}
           isActive={selectedStatFilter === "all"}
           onClick={() => handleStatCardClick("all")}
+          description="Total number of ads in the system, including all statuses and locations."
         />
         <StatCard
           label="Live Ads"
@@ -352,6 +354,7 @@ export default function AdsManagement() {
           icon={'/Images/AdManagement/Live_Ads.png'}
           isActive={selectedStatFilter === "live"}
           onClick={() => handleStatCardClick("live")}
+          description="Ads that are currently live and being displayed in the metro system."
         />
         <StatCard
           label="Expired Ads"
@@ -360,6 +363,7 @@ export default function AdsManagement() {
           icon={'/Images/AdManagement/Expired_Ads.png'}
           isActive={selectedStatFilter === "expired"}
           onClick={() => handleStatCardClick("expired")}
+          description="Ads that have expired and are no longer active in the metro system."
         />
       </div>
 
@@ -438,6 +442,7 @@ function StatCard({
   accent,
   isActive,
   onClick,
+  description
 }: {
   label: string;
   value: string;
@@ -445,6 +450,7 @@ function StatCard({
   accent: "violet" | "green" | "red";
   isActive: boolean;
   onClick: () => void;
+  description?: string;
 }) {
   const accentStyles = {
     violet: {
@@ -470,7 +476,12 @@ function StatCard({
       className={`flex items-center justify-between rounded-[8px] border bg-white px-5 py-4 text-left shadow-[rgba(0,0,0,0.05)] transition ${isActive ? "border-[#5E1B7F] ring-2 ring-[#5E1B7F1F]" : accentStyles[accent].card}`}
     >
       <div>
-        <p className="text-[16px] font-medium text-[#333333]">{label}</p>
+        <div className="flex gap-1 items-center">
+          <p className="text-[16px] font-medium text-[#333333]">{label}</p>
+          {description && (
+            <InfoTooltip description={description} />
+          )}
+        </div>
         <p className="mt-2 text-[24px] font-semibold leading-none text-slate-900">
           {value}
         </p>

@@ -237,7 +237,7 @@ function toUpdateModules(assignments: UserAccessAssignment[]) {
   return assignments
     .filter((assignment) => assignment.enabled)
     .map((assignment) => ({
-      id: assignment.moduleId,
+      moduleId: assignment.moduleId,
       name: assignment.moduleName,
       locationIds: assignment.locationIds,
     }));
@@ -255,7 +255,6 @@ function toCreateUserPayload(payload: ManagedUserFormPayload) {
     password: payload.password,
     roleId: Number(payload.roleId),
     roleName: payload.roleName?.trim(),
-    departmentId: 1,
     permissions: toCreatePermissions(payload.accessAssignments),
   };
 }
@@ -269,7 +268,7 @@ function toUpdateUserPayload(payload: UpdateUserRequestPayload) {
     email: payload.emailId.trim(),
     mobile: payload.mobileNumber.trim(),
     roleId: Number(payload.roleId),
-    modules: toUpdateModules(payload.accessAssignments),
+    permissions: toUpdateModules(payload.accessAssignments),
   };
 }
 
@@ -564,28 +563,12 @@ export async function updateUserRecord(
 export async function updateUserStatusRecord(
   payload: UpdateUserStatusRequest,
 ): Promise<string> {
-  const endpoint =
-    payload.status === "Active" ? "activate-user" : "deactivate-user";
-
   return requestWithFallback<string>(
     [
       {
         method: "post",
-        url: `${userApiRoot}/${endpoint}/${payload.id}`,
-      },
-      {
-        method: "patch",
-        url: `${userApiRoot}/status/${payload.id}`,
-        data: { status: payload.status },
-      },
-      {
-        method: "put",
-        url: `${userApiRoot}/update-user/${payload.id}`,
-        data: {
-          id: Number(payload.id),
-          status: payload.status,
-        },
-      },
+        url: `${userApiRoot}/deactivate-user/${payload.id}/${payload?.status.toLowerCase()}`,
+      }
     ],
     `Unable to mark user ${payload.status.toLowerCase()}.`,
     "message",
