@@ -149,6 +149,15 @@ function formatDateTime(value?: string | null): string {
   return `${day}-${month}-${year} ${hours}:${minutes}`;
 }
 
+function toComparableTimestamp(value?: string | null): number {
+  if (!value) {
+    return 0;
+  }
+
+  const parsed = new Date(value).getTime();
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 export default function DeviceManagement() {
   const dispatch = useAppDispatch();
   const toast = useToast();
@@ -172,7 +181,7 @@ export default function DeviceManagement() {
   const { user } = useAppSelector((state) => state.auth);
   const { items: userOptions, loading: usersLoading } = useAppSelector(
     (state) => state.users,
-  );
+  );  
 
   const data = items.map((device) => ({
     ...device,
@@ -189,6 +198,11 @@ export default function DeviceManagement() {
   const [resolvedById, setResolvedById] = useState("");
   const [selectedStatFilter, setSelectedStatFilter] =
     useState<DeviceStatFilter>("all");
+  const isAdminUser =
+    String(user?.role ?? user?.profile?.role?.name ?? "").toLowerCase() ===
+      "super_admin" ||
+    String(user?.role ?? user?.profile?.role?.name ?? "").toLowerCase() ===
+      "admin";
 
   useEffect(() => {
     if (!locationListLoaded) {
@@ -254,6 +268,10 @@ export default function DeviceManagement() {
       return;
     }
 
+    if (!isAdminUser) {
+      return;
+    }
+
     if (userOptions.length > 0) {
       return;
     }
@@ -265,7 +283,7 @@ export default function DeviceManagement() {
         status: "Active",
       }),
     );
-  }, [deviceAction, dispatch, userOptions.length]);
+  }, [deviceAction, dispatch, isAdminUser, userOptions.length]);
 
   useEffect(() => {
     if (!detailsDevice) {
@@ -279,14 +297,6 @@ export default function DeviceManagement() {
       }),
     );
   }, [detailsDevice, dispatch]);
-
-  const selectedResolvedBy = useMemo(
-    () =>
-      userOptions.find(
-        (option) => String(option.id ?? option.userId ?? "") === resolvedById,
-      ) ?? null,
-    [resolvedById, userOptions],
-  );
 
   const visibleDeviceDetails =
     detailsDevice && currentDeviceDetails?.device.id === detailsDevice.id
@@ -527,6 +537,9 @@ export default function DeviceManagement() {
           resolvedById={resolvedById}
           onResolvedByIdChange={setResolvedById}
           users={userOptions}
+          isAdminUser={isAdminUser}
+          hasExistingResolve={false}
+          loadingResolveDetails={false}
           usersLoading={usersLoading}
           submitting={resolveLoading || loading}
           onClose={() => {
@@ -603,32 +616,20 @@ export default function DeviceManagement() {
               return;
             }
 
-            const locationId = resolveDeviceLocationId(
-              deviceAction.device,
-              locationList,
-            );
-
-            if (!locationId) {
-              toast.warning(
-                "Unable to resolve location for this device.",
-                "Device",
-              );
+            if (isAdminUser && !resolvedById.trim()) {
+              toast.warning("Resolved By is required for admin.", "Device");
               return;
             }
 
             const result = await dispatch(
               resolveDevice({
-                id: deviceAction.device.id,
-                locationId,
-                deviceCode: deviceAction.device.deviceCode,
+                deviceId: deviceAction.device.id,
                 reason: resolveReason,
-                resolvedBy:
-                  selectedResolvedBy?.employeeName ||
-                  selectedResolvedBy?.username ||
-                  undefined,
-                resolvedById:
-                  selectedResolvedBy?.id ?? selectedResolvedBy?.userId,
-                userName: user?.profile?.username ?? "SYSTEM",
+                resolvedBy: isAdminUser
+                  ? resolvedById
+                  : user?.profile?.id
+                    ? String(user.profile.id)
+                    : undefined,
               }),
             );
 
@@ -725,6 +726,9 @@ function DeviceActionModal({
   resolvedById,
   onResolvedByIdChange,
   users,
+  isAdminUser,
+  hasExistingResolve,
+  loadingResolveDetails,
   usersLoading,
   submitting,
   onClose,
@@ -740,6 +744,9 @@ function DeviceActionModal({
   resolvedById: string;
   onResolvedByIdChange: (value: string) => void;
   users: ManagedUserRecord[];
+  isAdminUser: boolean;
+  hasExistingResolve: boolean;
+  loadingResolveDetails: boolean;
   usersLoading: boolean;
   submitting: boolean;
   onClose: () => void;
@@ -783,7 +790,10 @@ function DeviceActionModal({
   const submitDisabled = isRemoveAction
     ? !remarks.trim() || submitting
     : isResolveAction
-      ? !resolveReason.trim() || submitting
+      ? !resolveReason.trim() ||
+        (isAdminUser && !resolvedById.trim()) ||
+        submitting ||
+        loadingResolveDetails
       : submitting;
 
   return (
@@ -857,80 +867,86 @@ function DeviceActionModal({
               />
             </label>
 
-            <label className="block">
-              <span className="mb-2 block text-[14px] text-[#333333]">
-                Resolved By
-              </span>
-              <div className="relative w-full">
-                {/* Selected Value */}
-                <button
-                  type="button"
-                  onClick={() => setDropdownOpen((prev) => !prev)}
-                  className="flex w-full items-center justify-between rounded-[8px] border border-[#E6E6E6] bg-white px-4 py-3 text-sm text-[#333333] outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                >
-                  <span>
-                    {usersLoading ? "Loading users..." : selectedUserLabel}
-                  </span>
-
-                  <ChevronDown
-                    className={`h-4 w-4 text-[#667085] transition-transform ${
-                      dropdownOpen ? "rotate-180" : ""
-                    }`}
-                  />
-                </button>
-
-                {dropdownOpen && (
-                  <div className="absolute left-0 top-[calc(100%+0.35rem)] z-30 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg h-[150px] overflow-y-auto">
-                    {/* Default Option */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onResolvedByIdChange("");
-                        setDropdownOpen(false);
-                      }}
-                      className={`flex w-full items-center px-4 py-3 text-left text-sm transition ${
-                        !resolvedById
-                          ? "bg-[#F4ECFA] text-[#7C3AA8]"
-                          : "bg-white text-[#333333] hover:bg-slate-50"
-                      }`}
-                    >
-                      Select
-                    </button>
-
-                    {/* User Options */}
-                    {users.map((option) => {
-                      const optionValue = String(option.id ?? option.userId);
-
-                      const isSelected = String(resolvedById) === optionValue;
-
-                      return (
-                        <button
-                          key={optionValue}
-                          type="button"
-                          onClick={() => {
-                            onResolvedByIdChange(optionValue);
-                            setDropdownOpen(false);
-                          }}
-                          className={`flex w-full items-center px-4 py-3 text-left text-sm transition ${
-                            isSelected
-                              ? "bg-[#F4ECFA] text-[#7C3AA8]"
-                              : "bg-white text-[#333333] hover:bg-slate-50"
-                          }`}
-                          role="option"
-                          aria-selected={isSelected}
-                        >
-                          <span>
-                            {option.employeeName ||
-                              option.username ||
-                              option.empId}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
+            {loadingResolveDetails ? (
+              <div className="rounded-[8px] border border-[#E6E6E6] bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                Loading resolve details...
               </div>
-            </label>
+            ) : null}
+
+            {isAdminUser && (
+              <label className="block">
+                <span className="mb-2 block text-[14px] text-[#333333]">
+                  Resolved By <span className="text-rose-500">*</span>
+                </span>
+                <div className="relative w-full">
+                  <button
+                    type="button"
+                    onClick={() => setDropdownOpen((prev) => !prev)}
+                    className="flex w-full items-center justify-between rounded-[8px] border border-[#E6E6E6] bg-white px-4 py-3 text-sm text-[#333333] outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    disabled={usersLoading || loadingResolveDetails}
+                  >
+                    <span>
+                      {usersLoading ? "Loading users..." : selectedUserLabel}
+                    </span>
+
+                    <ChevronDown
+                      className={`h-4 w-4 text-[#667085] transition-transform ${
+                        dropdownOpen ? "rotate-180" : ""
+                      }`}
+                    />
+                  </button>
+
+                  {dropdownOpen && (
+                    <div className="absolute left-0 top-[calc(100%+0.35rem)] z-30 h-[150px] w-full overflow-y-auto overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onResolvedByIdChange("");
+                          setDropdownOpen(false);
+                        }}
+                        className={`flex w-full items-center px-4 py-3 text-left text-sm transition ${
+                          !resolvedById
+                            ? "bg-[#F4ECFA] text-[#7C3AA8]"
+                            : "bg-white text-[#333333] hover:bg-slate-50"
+                        }`}
+                      >
+                        Select
+                      </button>
+
+                      {users.map((option) => {
+                        const optionValue = String(option.id ?? option.userId);
+
+                        const isSelected = String(resolvedById) === optionValue;
+
+                        return (
+                          <button
+                            key={optionValue}
+                            type="button"
+                            onClick={() => {
+                              onResolvedByIdChange(optionValue);
+                              setDropdownOpen(false);
+                            }}
+                            className={`flex w-full items-center px-4 py-3 text-left text-sm transition ${
+                              isSelected
+                                ? "bg-[#F4ECFA] text-[#7C3AA8]"
+                                : "bg-white text-[#333333] hover:bg-slate-50"
+                            }`}
+                            role="option"
+                            aria-selected={isSelected}
+                          >
+                            <span>
+                              {option.employeeName ||
+                                option.username ||
+                                option.empId}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </label>
+            )}
           </div>
         ) : null}
 
@@ -954,7 +970,9 @@ function DeviceActionModal({
             {isRemoveAction
               ? "Yes, Remove"
               : isResolveAction
-                ? "Submit"
+                ? hasExistingResolve
+                  ? "Update"
+                  : "Submit"
                 : "Yes"}
           </button>
           <button
@@ -981,13 +999,92 @@ function DeviceDetailsModal({
 }) {
   const device = deviceDetails?.device ?? null;
   const history = deviceDetails?.resolutionHistory ?? [];
+  const [sortState, setSortState] = useState<SortState | null>(null);
+  const [filters, setFilters] = useState<Record<string, string>>({});
+
+  const historyColumns: Column<DeviceResolutionHistoryRecord>[] = [
+    {
+      label: "Remark",
+      key: "remarks",
+      filterable: true,
+      sortable: true,
+    },
+    {
+      label: "Resolve By",
+      key: "resolvedBy",
+      filterable: true,
+      sortable: true,
+    },
+    {
+      label: "Resolve Date",
+      key: "resolvedDate",
+      filterable: true,
+      sortable: true,
+      render: (row) => formatDateTime(row.resolvedDate),
+    },
+  ];
+
+  const filteredHistory = useMemo(
+    () =>
+      history.filter((entry) =>
+        Object.entries(filters).every(([key, value]) => {
+          if (!value.trim()) {
+            return true;
+          }
+
+          const normalizedValue = value.trim().toLowerCase();
+          const candidate =
+            key === "resolvedDate"
+              ? formatDateTime(entry.resolvedDate)
+              : String(entry[key as keyof DeviceResolutionHistoryRecord] ?? "");
+
+          return candidate.toLowerCase().includes(normalizedValue);
+        }),
+      ),
+    [filters, history],
+  );
+
+  const sortedHistory = useMemo(() => {
+    if (!sortState) {
+      return filteredHistory;
+    }
+
+    return [...filteredHistory].sort((left, right) => {
+      const leftValue =
+        sortState.key === "resolvedDate"
+          ? toComparableTimestamp(left.resolvedDate)
+          : String(
+              left[sortState.key as keyof DeviceResolutionHistoryRecord] ?? "",
+            ).toLowerCase();
+      const rightValue =
+        sortState.key === "resolvedDate"
+          ? toComparableTimestamp(right.resolvedDate)
+          : String(
+              right[sortState.key as keyof DeviceResolutionHistoryRecord] ?? "",
+            ).toLowerCase();
+
+      if (leftValue < rightValue) {
+        return sortState.direction === "ASC" ? -1 : 1;
+      }
+
+      if (leftValue > rightValue) {
+        return sortState.direction === "ASC" ? 1 : -1;
+      }
+
+      return 0;
+    });
+  }, [filteredHistory, sortState]);
 
   return (
-    <Modal onClose={onClose} className="max-w-6xl rounded-[12px]">
-      <div className="px-6 py-5">
+    <Modal
+      onClose={onClose}
+      className="max-w-[calc(100vw-1rem)] rounded-[12px] sm:max-w-6xl"
+    >
+      <div className="flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden">
+      <div className="overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
         <div className="flex items-start justify-between">
           <div>
-            <h2 className="text-[20px] font-semibold text-[#333333]">
+            <h2 className="text-[18px] font-semibold text-[#333333] sm:text-[20px]">
               Device Details
             </h2>
           </div>
@@ -1001,8 +1098,8 @@ function DeviceDetailsModal({
           </button>
         </div>
 
-        <div className="mt-5 rounded-2xl bg-[#F3F3F3] p-5">
-          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+        <div className="mt-4 rounded-2xl bg-[#F3F3F3] p-4 sm:mt-5 sm:p-5">
+          <div className="grid gap-4 sm:gap-5 md:grid-cols-2 xl:grid-cols-4">
             <DetailField label="Brand" value={device?.brand ?? "-"} />
             <DetailField label="Model" value={device?.model ?? "-"} />
             <DetailField
@@ -1029,37 +1126,42 @@ function DeviceDetailsModal({
         </div>
 
         <div className="mt-6">
-          <h3 className="text-[20px] font-semibold text-[#333333]">
+          <h3 className="text-[18px] font-semibold text-[#333333] sm:text-[20px]">
             Device Resolution History
           </h3>
 
-          <div className="mt-4 overflow-hidden rounded-2xl border border-[#E4E7EC]">
-            <div className="flex items-center bg-[#F4F1FF] px-6 py-4 text-sm font-semibold text-[#4B5563]">
-              <span className="basis-[45%] pr-4">Remark</span>
-              <span className="basis-[25%] px-4">Resolve By</span>
-              <span className="basis-[30%] pl-4">Resolve Date</span>
-            </div>
+          <div className="mt-4">
+            <DataTable
+              data={sortedHistory}
+              columns={historyColumns}
+              loading={loading}
+              page={1}
+              totalPages={1}
+              sortState={sortState}
+              onPageChange={() => undefined}
+              onFilter={(key, value) => {
+                setFilters((current) => ({
+                  ...current,
+                  [key]: value,
+                }));
+              }}
+              onSort={(key) => {
+                setSortState((current) => {
+                  if (current?.key !== key) {
+                    return { key, direction: "ASC" };
+                  }
 
-            <div className="max-h-[340px] overflow-y-auto bg-white">
-              {loading ? (
-                <div className="px-6 py-10 text-center text-sm text-slate-500">
-                  Loading device history...
-                </div>
-              ) : history.length ? (
-                history.map((entry, index) => (
-                  <HistoryRow
-                    key={String(entry.id ?? `${entry.resolvedDate}-${index}`)}
-                    entry={entry}
-                  />
-                ))
-              ) : (
-                <div className="px-6 py-10 text-center text-sm text-slate-500">
-                  No resolution history available.
-                </div>
-              )}
-            </div>
+                  if (current.direction === "ASC") {
+                    return { key, direction: "DESC" };
+                  }
+
+                  return null;
+                });
+              }}
+            />
           </div>
         </div>
+      </div>
       </div>
     </Modal>
   );
@@ -1070,18 +1172,6 @@ function DetailField({ label, value }: { label: string; value: ReactNode }) {
     <div>
       <p className="text-[12px] text-slate-500">{label}</p>
       <p className="mt-1 text-[16px] font-medium text-[#333333]">{value}</p>
-    </div>
-  );
-}
-
-function HistoryRow({ entry }: { entry: DeviceResolutionHistoryRecord }) {
-  return (
-    <div className="flex items-center border-t border-[#EEF2F6] px-6 py-5 text-sm text-[#333333] first:border-t-0">
-      <span className="basis-[45%] pr-4">{entry.remarks}</span>
-      <span className="basis-[25%] px-4">{entry.resolvedBy}</span>
-      <span className="basis-[30%] pl-4">
-        {formatDateTime(entry.resolvedDate)}
-      </span>
     </div>
   );
 }

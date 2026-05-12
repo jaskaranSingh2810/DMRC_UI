@@ -271,7 +271,7 @@ export default function DataTable<T>({
             {loading && data.length > 0 ? (
               <div className="pointer-events-none absolute inset-0 flex items-start justify-center bg-white/45 pt-16 backdrop-blur-[1px]">
                 <div className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 shadow-sm">
-                  Updating...
+                  Loading...
                 </div>
               </div>
             ) : null}

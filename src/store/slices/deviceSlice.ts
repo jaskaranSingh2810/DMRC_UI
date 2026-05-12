@@ -133,18 +133,30 @@ interface RemoveDeviceRequest {
 }
 
 interface ResolveDeviceRequest {
-  id: number;
-  deviceCode: string;
-  locationId: number;
+  resolveId?: number;
+  deviceId: number;
   reason: string;
-  resolvedBy?: string;
-  resolvedById?: string | number;
-  userName: string;
+  resolvedBy?: string | number;
 }
 
 interface FetchDeviceDetailsRequest {
   id: number;
   deviceCode?: string;
+}
+
+interface DeviceResolveRecord {
+  id: number;
+  deviceId: number;
+  reason: string;
+  resolvedBy?: string | number;
+  resolvedAt?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+interface ResolveDeviceResult {
+  message: string;
+  record: DeviceResolveRecord;
 }
 
 interface DeviceDownloadPayload {
@@ -228,6 +240,7 @@ function normalizeResolutionHistoryEntry(
   value: unknown,
 ): DeviceResolutionHistoryRecord {
   const record = getRecord(value) ?? {};
+  const resolvedByRecord = getRecord(record.resolvedBy);
 
   return {
     id: getString(record.id || record.historyId || record.resolutionId, "") || undefined,
@@ -237,12 +250,17 @@ function normalizeResolutionHistoryEntry(
       getString(record.reason) ||
       "-",
     resolvedBy:
+      getString(resolvedByRecord?.empName) ||
+      getString(resolvedByRecord?.employeeName) ||
+      getString(resolvedByRecord?.username) ||
+      getString(resolvedByRecord?.empId) ||
       getString(record.resolvedBy) ||
       getString(record.resolveBy) ||
       getString(record.updatedBy) ||
       getString(record.createdBy) ||
       "-",
     resolvedDate:
+      getString(record.resolvedAt) ||
       getString(record.resolvedDate) ||
       getString(record.resolveDate) ||
       getString(record.updatedAt) ||
@@ -263,8 +281,10 @@ function normalizeDeviceDetails(
     record;
   const historySource =
     record.resolutionHistory ??
+    record.resolves ??
     record.deviceResolutionHistory ??
     record.history ??
+    getRecord(record.device)?.resolves ??
     getRecord(record.device)?.resolutionHistory ??
     [];
 
@@ -274,6 +294,27 @@ function normalizeDeviceDetails(
       ? historySource.map(normalizeResolutionHistoryEntry)
       : [],
   };
+}
+
+function normalizeResolveId(
+  value: string | number | undefined,
+): string | number | undefined {
+  if (typeof value === "number") {
+    return value;
+  }
+
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return undefined;
+  }
+
+  const numericValue = Number(trimmed);
+  return Number.isFinite(numericValue) ? numericValue : trimmed;
 }
 
 async function requestApiData<TData>(
@@ -486,54 +527,51 @@ export const updateDeviceStatus = createAsyncThunk<
 });
 
 export const resolveDevice = createAsyncThunk<
-  DeviceStatusUpdateResult,
+  ResolveDeviceResult,
   ResolveDeviceRequest,
   { rejectValue: string }
 >("devices/resolve", async (payload, { rejectWithValue }) => {
   try {
     const requestBody = {
-      id: payload.id,
-      deviceId: payload.id,
-      deviceCode: payload.deviceCode,
-      locationId: payload.locationId,
-      remarks: payload.reason.trim(),
+      deviceId: payload.deviceId,
       reason: payload.reason.trim(),
-      resolvedBy: payload.resolvedBy?.trim() || undefined,
-      resolvedById: payload.resolvedById,
-      updatedBy: payload.userName,
-      userName: payload.userName,
-      status: "Resolved",
+      ...(payload.resolvedBy !== undefined
+        ? { resolvedBy: normalizeResolveId(payload.resolvedBy) }
+        : {}),
     };
 
-    const message = (await requestWithFallback<string>(
-      [
-        {
-          method: "post",
-          url: "/api/v1/dmrc/device/resolve",
-          data: requestBody,
-        },
-        {
-          method: "post",
-          url: `/api/v1/dmrc/device/resolve/${payload.id}`,
-          data: requestBody,
-        },
-        {
-          method: "patch",
-          url: `/api/v1/dmrc/device/${payload.id}/resolve`,
-          data: requestBody,
-        },
-        {
-          method: "patch",
-          url: "/api/v1/dmrc/device/update-resolution",
-          data: requestBody,
-        },
-      ],
-      "Unable to resolve device.",
-      "message",
-    )) as string;
+    const response: AxiosResponse<ApiEnvelope<unknown>> = payload.resolveId
+      ? await axiosInstance.patch(
+          `/api/v1/dmrc/resolve/${payload.resolveId}`,
+          requestBody,
+        )
+      : await axiosInstance.post("/api/v1/dmrc/resolve", requestBody);
+
+    if (!isApiSuccess(response.data)) {
+      return rejectWithValue(
+        getApiMessage(response.data, "Unable to resolve device."),
+      );
+    }
 
     return {
-      message,
+      message: getApiMessage(response.data, "Device resolved successfully."),
+      record: {
+        id: getNumber(getRecord(getApiData(response.data))?.id),
+        deviceId: getNumber(getRecord(getApiData(response.data))?.deviceId),
+        reason: getString(getRecord(getApiData(response.data))?.reason),
+        resolvedBy: normalizeResolveId(
+          getString(getRecord(getApiData(response.data))?.resolvedBy, ""),
+        ),
+        resolvedAt:
+          getString(getRecord(getApiData(response.data))?.resolvedAt, "") ||
+          null,
+        createdAt:
+          getString(getRecord(getApiData(response.data))?.createdAt, "") ||
+          null,
+        updatedAt:
+          getString(getRecord(getApiData(response.data))?.updatedAt, "") ||
+          null,
+      },
     };
   } catch (error) {
     return rejectWithValue(parseApiError(error, "Unable to resolve device."));

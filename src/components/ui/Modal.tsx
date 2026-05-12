@@ -31,7 +31,7 @@ export default function Modal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/55 px-4 py-8 backdrop-blur-sm"
+      className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-slate-950/55 px-3 py-3 backdrop-blur-sm sm:items-center sm:px-4 sm:py-8"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) {
           onClose();
@@ -40,7 +40,7 @@ export default function Modal({
     >
       <div
         ref={contentRef}
-        className={`relative w-full max-w-2xl rounded-[28px] bg-white shadow-2xl ${className}`}
+        className={`relative my-auto flex max-h-[calc(100vh-2rem)] w-full flex-col overflow-hidden rounded-[28px] bg-white shadow-2xl ${className}`}
       >
         {title ? (
           <div className="flex items-start justify-between border-b border-slate-200 px-6 py-5">

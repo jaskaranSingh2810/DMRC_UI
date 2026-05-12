@@ -61,42 +61,45 @@ export function mapBackendMenu(menu: SidebarMenuItem[]): MenuItem[] {
 }
 
 export default function Sidebar({
+  isCollapsed,
+  isMobile,
   isOpen,
-  setIsOpen,
+  onClose,
+  onToggleCollapse,
 }: {
+  isCollapsed: boolean;
+  isMobile: boolean;
   isOpen: boolean;
-  setIsOpen: (val: boolean) => void;
+  onClose: () => void;
+  onToggleCollapse: () => void;
 }) {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const user = useAppSelector((state) => state.auth.user);
-  const [collapsed, setCollapsed] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [logoutLoading, setLogoutLoading] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth < 768) {
-        setCollapsed(false);
-      } else {
-        setIsOpen(false);
-      }
-    };
-
-    handleResize();
-    window.addEventListener("resize", handleResize);
-
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
+    if (isMobile) {
+      onClose();
+    }
+  }, [isMobile, pathname]);
 
   useEffect(() => {
-    if (window.innerWidth < 768) {
-      setIsOpen(false);
+    if (!isMobile || !isOpen) {
+      document.body.style.overflow = "";
+      return;
     }
-  }, [pathname, setIsOpen]);
+
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isMobile, isOpen]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -134,7 +137,7 @@ export default function Sidebar({
     try {
       setLogoutLoading(true);
       await dispatch(logoutUser());
-      setIsOpen(false);
+      onClose();
       navigate("/login", { replace: true });
     } finally {
       setLogoutLoading(false);
@@ -145,27 +148,25 @@ export default function Sidebar({
 
   return (
     <>
-      {isOpen ? (
+      {isMobile && isOpen ? (
         <div
           className="fixed inset-0 z-40 bg-black/40 md:hidden"
-          onClick={() => setIsOpen(false)}
+          onClick={onClose}
         />
       ) : null}
 
       <aside
         className={`
-    fixed z-50 h-full bg-custom-gradient text-white transition-all duration-300 h-100vh overflow-auto
-    
-    ${isOpen ? "translate-x-0" : "-translate-x-full"}
-    md:translate-x-0 md:static
-    
-    w-64 ${collapsed ? "md:w-20" : "md:w-64"}
+    fixed inset-y-0 left-0 z-50 h-screen overflow-y-auto bg-custom-gradient text-white transition-all duration-300
+    md:static md:translate-x-0
+    ${isMobile ? (isOpen ? "translate-x-0" : "-translate-x-full") : "translate-x-0"}
+    w-64 ${isCollapsed ? "md:w-20" : "md:w-64"}
   `}
       >
         <div className="flex h-full flex-col justify-between">
           <div>
             <div className="flex items-center justify-between border-b border-blue-800 p-4 pl-[25px]">
-              {!collapsed ? (
+              {!isCollapsed ? (
                 <img
                   src="/Images/Sidebar/Sidebar_Logo.png"
                   alt="Logo"
@@ -176,16 +177,21 @@ export default function Sidebar({
               <div className="flex items-center gap-2">
                 <button
                   className="hidden md:block"
-                  onClick={() => setCollapsed(!collapsed)}
+                  onClick={onToggleCollapse}
+                  aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
                 >
-                  {collapsed ? (
+                  {isCollapsed ? (
                     <PanelRightOpen size={18} />
                   ) : (
                     <PanelRightClose size={18} />
                   )}
                 </button>
 
-                <button className="md:hidden" onClick={() => setIsOpen(false)}>
+                <button
+                  className="md:hidden"
+                  onClick={onClose}
+                  aria-label="Close sidebar"
+                >
                   <X size={20} />
                 </button>
               </div>
@@ -196,8 +202,8 @@ export default function Sidebar({
                 <MenuItemComponent
                   key={`${menu.label}-${menu.path?.join("-")}`} // safer key
                   {...menu}
-                  collapsed={collapsed}
-                  setIsOpen={setIsOpen}
+                  collapsed={isCollapsed}
+                  onSelect={onClose}
                 />
               ))}
             </nav>
@@ -215,15 +221,15 @@ export default function Sidebar({
               <img
                 src="/Images/Sidebar/Sidebar_User.png"
                 alt="User"
-                className="h-12 w-12 rounded-full border-2 border-white/80 object-cover shadow-[0_10px_24px_rgba(0,0,0,0.2)]"
+                className="lg:h-12 lg:w-12 h-10 w-10 rounded-full border-2 border-white/80 object-cover shadow-[0_10px_24px_rgba(0,0,0,0.2)]"
               />
 
-              {!collapsed ? (
+              {!isCollapsed ? (
                 <div className="min-w-0 flex-1 text-left">
-                  <div className="truncate text-[20px] font-semibold uppercase leading-none text-white">
+                  <div className="truncate lg:text-[20px] md:text-[16px] text-[14px] font-semibold uppercase leading-none text-white">
                     {user?.profile?.username ?? "USER"}
                   </div>
-                  <div className="mt-1 truncate text-[16px] font-400 text-white/80">
+                  <div className="mt-1 truncate lg:text-[16px] md:text-[14px] text-[12px] font-400 text-white/80">
                     {user?.role ?? "User"}
                   </div>
                 </div>
@@ -237,7 +243,7 @@ export default function Sidebar({
               />
             </button>
 
-            {profileMenuOpen && !collapsed ? (
+            {profileMenuOpen && !isCollapsed ? (
               <div
                 className="absolute bottom-[calc(100%)] left-[3.25rem] right-4 z-50 overflow-hidden rounded-2xl border border-white/10 bg-white/20 px-4 py-4 shadow-[0_22px_44px_rgba(0,0,0,0.22)] backdrop-blur-sm"
                 role="menu"
@@ -252,7 +258,7 @@ export default function Sidebar({
                     alt="Change Password"
                     className="h-5 w-5"
                   />
-                  <span className="text-[14px] font-medium">
+                  <span className="lg:text-[14px] md:text-[12px] text-[12px] font-medium">
                     Change Password
                   </span>
                 </button>
@@ -268,7 +274,7 @@ export default function Sidebar({
                     alt="Logout"
                     className="h-5 w-5"
                   />
-                  <span className="text-[14px] font-medium">Logout</span>
+                  <span className="lg:text-[14px] text-[12px] font-medium">Logout</span>
                 </button>
               </div>
             ) : null}
@@ -292,8 +298,8 @@ function MenuItemComponent({
   path,
   icon: Icon,
   collapsed,
-  setIsOpen,
-}: MenuItem & { collapsed: boolean; setIsOpen: (val: boolean) => void }) {
+  onSelect,
+}: MenuItem & { collapsed: boolean; onSelect: () => void }) {
   const { pathname } = useLocation();
 
   const isActive = path.some(
@@ -303,7 +309,7 @@ function MenuItemComponent({
   return (
     <NavLink
       to={path[0]}
-      onClick={() => setIsOpen(false)}
+      onClick={onSelect}
       className={`group relative flex items-center gap-3 rounded-lg pl-4 py-2 transition-all
         ${
           isActive
@@ -313,10 +319,10 @@ function MenuItemComponent({
     >
       <img src={Icon} alt={label} className="h-5 w-5" />
 
-      {!collapsed ? <span className="text-sm">{label}</span> : null}
+      {!collapsed ? <span className="lg:text-sm text-xs">{label}</span> : null}
 
       {collapsed ? (
-        <span className="absolute left-14 z-50 hidden whitespace-nowrap rounded bg-black px-2 py-1 text-xs text-white group-hover:block">
+        <span className="absolute left-14 z-50 hidden whitespace-nowrap rounded bg-black px-2 py-1 lg:text-xs md:text-[12px] text-white group-hover:block">
           {label}
         </span>
       ) : null}

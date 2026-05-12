@@ -164,23 +164,34 @@ export default function Header({
 
   return (
     <div
-      className={`flex justify-between p-4 bg-[rgb(245 247 250 / var(--tw-bg-opacity, 1))] ${isCreatePage && "hidden"} rounded-[12px]`}
+      className={`flex justify-between p-4 bg-[rgb(245 247 250 / var(--tw-bg-opacity, 1))] rounded-[12px]`}
     >
       <div className="flex gap-3 items-center">
-        <button onClick={toggleSidebar} className="md:hidden">
+        <button
+          onClick={toggleSidebar}
+          className="rounded-md border border-slate-200 bg-white p-2 text-slate-700 transition hover:bg-slate-50 md:hidden"
+          aria-label="Toggle sidebar"
+          type="button"
+        >
           <Menu />
         </button>
-        <h1 className="text-[24px] font-semibold">{config.title}</h1>
+        <h1 className="lg:text-[24px] md:text-[22px] text-[20px] font-semibold">
+          {config.title}
+        </h1>
       </div>
 
-      <div className="flex flex-wrap items-center justify-end gap-3">
+      <div
+        className={`flex flex-wrap items-center justify-end gap-3 ${
+          isCreatePage ? "hidden" : ""
+        }`}
+      >
         {isDeviceManagementPage ? (
           <>
             <div ref={locationMenuRef} className="relative">
               <button
                 type="button"
                 onClick={() => setLocationMenuOpen((current) => !current)}
-                className="flex min-w-[170px] items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-[6px] text-[14px] font-semibold text-[#333333] outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                className="flex min-w-[170px] items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-[6px] lg:text-[14px] md:text-[12px] text-[12px] font-semibold text-[#333333] outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                 aria-haspopup="listbox"
                 aria-expanded={locationMenuOpen}
               >
@@ -194,7 +205,7 @@ export default function Header({
               </button>
 
               {locationMenuOpen ? (
-                <div className="absolute right-0 top-[calc(100%+0.35rem)] z-30 min-w-[170px] overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg">
+                <div className="absolute right-0 top-[calc(100%+0.35rem)] z-30 lg:min-w-[170px] overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg">
                   <button
                     type="button"
                     onClick={() => {
@@ -286,7 +297,7 @@ export default function Header({
             </button>
 
             {moduleMenuOpen ? (
-              <div className="absolute right-0 top-[calc(100%+0.35rem)] z-30 min-w-[220px] overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg">
+              <div className="absolute right-0 top-[calc(100%+0.35rem)] z-30 lg:min-w-[220px] overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg">
                 <button
                   type="button"
                   onClick={() => {
