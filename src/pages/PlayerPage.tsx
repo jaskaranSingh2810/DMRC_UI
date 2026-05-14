@@ -21,7 +21,7 @@ type Column<T> = {
 const METRO_TIMINGS: MetroTiming[] = [
   { destination: "Yashoobhoomi", platform: "5", eta: "5 mins" },
   { destination: "New Delhi", platform: "4", eta: "4 mins" },
-  // { destination: "Yashoobhoomi", platform: "5", eta: "5 mins" },
+  { destination: "Yashoobhoomi", platform: "5", eta: "5 mins" },
   // { destination: "Yashoobhoomi", platform: "5", eta: "5 mins" },
 ];
 

@@ -181,7 +181,7 @@ export default function DeviceManagement() {
   const { user } = useAppSelector((state) => state.auth);
   const { items: userOptions, loading: usersLoading } = useAppSelector(
     (state) => state.users,
-  );  
+  );
 
   const data = items.map((device) => ({
     ...device,
@@ -427,7 +427,7 @@ export default function DeviceManagement() {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <StatCard
           label="Total Devices"
           value={String(summary.totalDevices)}
@@ -703,15 +703,15 @@ function StatCard({
     >
       <div>
         <div className="flex gap-1">
-          <p className="text-[16px] font-medium text-[#333333]">{label}</p>
+          <p className="text-[12px] lg:text-[14px] xl:text-[16px] font-medium text-[#333333]">{label}</p>
           {description ? <InfoTooltip description={description} /> : null}
         </div>
-        <p className="mt-2 text-[24px] font-semibold leading-none text-slate-900">
+        <p className="mt-2 text-[16px] lg:text-[20px] xl:text-[24px] font-semibold leading-none text-slate-900">
           {value}
         </p>
       </div>
-      <div className="flex h-14 w-14 items-center justify-center rounded-xl">
-        <img src={icon} alt={label} className="h-14 w-14" />
+      <div className="flex md:h-10 md:w-10 xl:h-14 xl:w-14 items-center justify-center rounded-xl">
+        <img src={icon} alt={label} className="md:h-10 md:w-10 lg:h-12 lg:w-12 xl:h-14 xl:w-14" />
       </div>
     </button>
   );
@@ -798,190 +798,197 @@ function DeviceActionModal({
 
   return (
     <Modal onClose={onClose} className="max-w-xl">
-      <div className="px-8 py-9 text-center rounded-[8px]">
-        <div
-          className={`mx-auto flex h-20 w-20 items-center justify-center rounded-full ${
-            isRemoveAction
-              ? "bg-rose-50"
-              : isResolveAction
-                ? "bg-[#F7F7F7]"
-                : "bg-sky-50"
-          }`}
-        >
+      <div className="flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden">
+        <div className="overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
+          <div
+            className={`mx-auto flex h-20 w-20 items-center justify-center rounded-full ${
+              isRemoveAction
+                ? "bg-rose-50"
+                : isResolveAction
+                  ? "bg-[#F7F7F7]"
+                  : "bg-sky-50"
+            }`}
+          >
+            {isRemoveAction ? (
+              <Trash2 size={34} className="text-rose-500" />
+            ) : isResolveAction ? (
+              <div className="relative">
+                <img
+                  src="/Images/DeviceManagement/Resolve_Device.png"
+                  alt="Resolve"
+                />
+              </div>
+            ) : (
+              <div className="relative">
+                <Monitor size={40} className="text-sky-600" />
+                <Power
+                  size={16}
+                  className="absolute -right-1 -top-1 text-rose-500"
+                />
+              </div>
+            )}
+          </div>
+
+          <h3 className="mt-6 text-[22px] font-medium leading-tight text-[#333333]">
+            {title}
+          </h3>
+          <p className="mt-4 text-[13px] leading-6 text-[#566272]">
+            {description}
+          </p>
+
           {isRemoveAction ? (
-            <Trash2 size={34} className="text-rose-500" />
-          ) : isResolveAction ? (
-            <div className="relative">
-              <img
-                src="/Images/DeviceManagement/Resolve_Device.png"
-                alt="Resolve"
-              />
-            </div>
-          ) : (
-            <div className="relative">
-              <Monitor size={40} className="text-sky-600" />
-              <Power
-                size={16}
-                className="absolute -right-1 -top-1 text-rose-500"
-              />
-            </div>
-          )}
-        </div>
-
-        <h3 className="mt-6 text-[22px] font-medium leading-tight text-[#333333]">
-          {title}
-        </h3>
-        <p className="mt-4 text-[13px] leading-6 text-[#566272]">
-          {description}
-        </p>
-
-        {isRemoveAction ? (
-          <label className="mt-6 block text-left">
-            <span className="mb-2 block text-[14px] text-[#333333]">
-              * Reason
-            </span>
-            <textarea
-              value={remarks}
-              onChange={(event) => onRemarksChange(event.target.value)}
-              rows={4}
-              className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-              placeholder="Add a reason before removing the device"
-              required
-            />
-          </label>
-        ) : null}
-
-        {isResolveAction ? (
-          <div className="mt-6 space-y-4 text-left">
-            <label className="block">
+            <label className="mt-6 block text-left">
               <span className="mb-2 block text-[14px] text-[#333333]">
-                Reason <span className="text-rose-500">*</span>
+                * Reason
               </span>
               <textarea
-                value={resolveReason}
-                onChange={(event) => onResolveReasonChange(event.target.value)}
+                value={remarks}
+                onChange={(event) => onRemarksChange(event.target.value)}
                 rows={4}
-                className="w-full rounded-[8px] border border-[#E6E6E6] px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                placeholder="Please enter resolving reason"
+                className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                placeholder="Add a reason before removing the device"
                 required
               />
             </label>
+          ) : null}
 
-            {loadingResolveDetails ? (
-              <div className="rounded-[8px] border border-[#E6E6E6] bg-slate-50 px-4 py-3 text-sm text-slate-500">
-                Loading resolve details...
-              </div>
-            ) : null}
-
-            {isAdminUser && (
+          {isResolveAction ? (
+            <div className="mt-6 space-y-4 text-left">
               <label className="block">
                 <span className="mb-2 block text-[14px] text-[#333333]">
-                  Resolved By <span className="text-rose-500">*</span>
+                  Reason <span className="text-rose-500">*</span>
                 </span>
-                <div className="relative w-full">
-                  <button
-                    type="button"
-                    onClick={() => setDropdownOpen((prev) => !prev)}
-                    className="flex w-full items-center justify-between rounded-[8px] border border-[#E6E6E6] bg-white px-4 py-3 text-sm text-[#333333] outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                    disabled={usersLoading || loadingResolveDetails}
-                  >
-                    <span>
-                      {usersLoading ? "Loading users..." : selectedUserLabel}
-                    </span>
-
-                    <ChevronDown
-                      className={`h-4 w-4 text-[#667085] transition-transform ${
-                        dropdownOpen ? "rotate-180" : ""
-                      }`}
-                    />
-                  </button>
-
-                  {dropdownOpen && (
-                    <div className="absolute left-0 top-[calc(100%+0.35rem)] z-30 h-[150px] w-full overflow-y-auto overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          onResolvedByIdChange("");
-                          setDropdownOpen(false);
-                        }}
-                        className={`flex w-full items-center px-4 py-3 text-left text-sm transition ${
-                          !resolvedById
-                            ? "bg-[#F4ECFA] text-[#7C3AA8]"
-                            : "bg-white text-[#333333] hover:bg-slate-50"
-                        }`}
-                      >
-                        Select
-                      </button>
-
-                      {users.map((option) => {
-                        const optionValue = String(option.id ?? option.userId);
-
-                        const isSelected = String(resolvedById) === optionValue;
-
-                        return (
-                          <button
-                            key={optionValue}
-                            type="button"
-                            onClick={() => {
-                              onResolvedByIdChange(optionValue);
-                              setDropdownOpen(false);
-                            }}
-                            className={`flex w-full items-center px-4 py-3 text-left text-sm transition ${
-                              isSelected
-                                ? "bg-[#F4ECFA] text-[#7C3AA8]"
-                                : "bg-white text-[#333333] hover:bg-slate-50"
-                            }`}
-                            role="option"
-                            aria-selected={isSelected}
-                          >
-                            <span>
-                              {option.employeeName ||
-                                option.username ||
-                                option.empId}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
+                <textarea
+                  value={resolveReason}
+                  onChange={(event) =>
+                    onResolveReasonChange(event.target.value)
+                  }
+                  rows={4}
+                  className="w-full rounded-[8px] border border-[#E6E6E6] px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  placeholder="Please enter resolving reason"
+                  required
+                />
               </label>
-            )}
-          </div>
-        ) : null}
 
-        <div className="mt-8 grid grid-cols-2 gap-3">
-          <button
-            type="button"
-            onClick={() =>
-              void (isRemoveAction
-                ? onRemove()
+              {loadingResolveDetails ? (
+                <div className="rounded-[8px] border border-[#E6E6E6] bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                  Loading resolve details...
+                </div>
+              ) : null}
+
+              {isAdminUser && (
+                <label className="block">
+                  <span className="mb-2 block text-[14px] text-[#333333]">
+                    Resolved By <span className="text-rose-500">*</span>
+                  </span>
+                  <div className="relative w-full">
+                    <button
+                      type="button"
+                      onClick={() => setDropdownOpen((prev) => !prev)}
+                      className="flex w-full items-center justify-between rounded-[8px] border border-[#E6E6E6] bg-white px-4 py-3 text-sm text-[#333333] outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                      disabled={usersLoading || loadingResolveDetails}
+                    >
+                      <span>
+                        {usersLoading ? "Loading users..." : selectedUserLabel}
+                      </span>
+
+                      <ChevronDown
+                        className={`h-4 w-4 text-[#667085] transition-transform ${
+                          dropdownOpen ? "rotate-180" : ""
+                        }`}
+                      />
+                    </button>
+
+                    {dropdownOpen && (
+                      <div className="absolute left-0 top-[calc(100%+0.35rem)] z-30 h-[150px] w-full overflow-y-auto overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onResolvedByIdChange("");
+                            setDropdownOpen(false);
+                          }}
+                          className={`flex w-full items-center px-4 py-3 text-left text-sm transition ${
+                            !resolvedById
+                              ? "bg-[#F4ECFA] text-[#7C3AA8]"
+                              : "bg-white text-[#333333] hover:bg-slate-50"
+                          }`}
+                        >
+                          Select
+                        </button>
+
+                        {users.map((option) => {
+                          const optionValue = String(
+                            option.id ?? option.userId,
+                          );
+
+                          const isSelected =
+                            String(resolvedById) === optionValue;
+
+                          return (
+                            <button
+                              key={optionValue}
+                              type="button"
+                              onClick={() => {
+                                onResolvedByIdChange(optionValue);
+                                setDropdownOpen(false);
+                              }}
+                              className={`flex w-full items-center px-4 py-3 text-left text-sm transition ${
+                                isSelected
+                                  ? "bg-[#F4ECFA] text-[#7C3AA8]"
+                                  : "bg-white text-[#333333] hover:bg-slate-50"
+                              }`}
+                              role="option"
+                              aria-selected={isSelected}
+                            >
+                              <span>
+                                {option.employeeName ||
+                                  option.username ||
+                                  option.empId}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </label>
+              )}
+            </div>
+          ) : null}
+
+          <div className="mt-8 grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() =>
+                void (isRemoveAction
+                  ? onRemove()
+                  : isResolveAction
+                    ? onResolve()
+                    : onConfirmStatus())
+              }
+              className={`rounded-xl px-4 py-3 font-semibold transition ${
+                submitDisabled
+                  ? "cursor-not-allowed bg-[#B8B8B8] text-[#333333] opacity-70"
+                  : "bg-custom-gradient text-white hover:opacity-95"
+              }`}
+              disabled={submitDisabled}
+            >
+              {isRemoveAction
+                ? "Yes, Remove"
                 : isResolveAction
-                  ? onResolve()
-                  : onConfirmStatus())
-            }
-            className={`rounded-xl px-4 py-3 font-semibold transition ${
-              submitDisabled
-                ? "cursor-not-allowed bg-[#B8B8B8] text-[#333333] opacity-70"
-                : "bg-custom-gradient text-white hover:opacity-95"
-            }`}
-            disabled={submitDisabled}
-          >
-            {isRemoveAction
-              ? "Yes, Remove"
-              : isResolveAction
-                ? hasExistingResolve
-                  ? "Update"
-                  : "Submit"
-                : "Yes"}
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-xl border border-slate-300 px-4 py-3 font-semibold text-[#333333] transition hover:bg-slate-50"
-          >
-            Cancel
-          </button>
+                  ? hasExistingResolve
+                    ? "Update"
+                    : "Submit"
+                  : "Yes"}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-xl border border-slate-300 px-4 py-3 font-semibold text-[#333333] transition hover:bg-slate-50"
+            >
+              Cancel
+            </button>
+          </div>
         </div>
       </div>
     </Modal>
@@ -1081,87 +1088,90 @@ function DeviceDetailsModal({
       className="max-w-[calc(100vw-1rem)] rounded-[12px] sm:max-w-6xl"
     >
       <div className="flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden">
-      <div className="overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
-        <div className="flex items-start justify-between">
-          <div>
-            <h2 className="text-[18px] font-semibold text-[#333333] sm:text-[20px]">
-              Device Details
-            </h2>
+        <div className="overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
+          <div className="flex items-start justify-between">
+            <div>
+              <h2 className="text-[18px] font-semibold text-[#333333] sm:text-[20px]">
+                Device Details
+              </h2>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-full bg-slate-100 p-2 text-slate-500 transition hover:bg-slate-200 hover:text-slate-800"
+              aria-label="Close details modal"
+            >
+              <XCircle size={18} />
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full bg-slate-100 p-2 text-slate-500 transition hover:bg-slate-200 hover:text-slate-800"
-            aria-label="Close details modal"
-          >
-            <XCircle size={18} />
-          </button>
-        </div>
 
-        <div className="mt-4 rounded-2xl bg-[#F3F3F3] p-4 sm:mt-5 sm:p-5">
-          <div className="grid gap-4 sm:gap-5 md:grid-cols-2 xl:grid-cols-4">
-            <DetailField label="Brand" value={device?.brand ?? "-"} />
-            <DetailField label="Model" value={device?.model ?? "-"} />
-            <DetailField
-              label="Orientation"
-              value={device?.orientation ?? "-"}
-            />
-            <DetailField
-              label="Location"
-              value={
-                device?.locationName ?? device?.locations?.locationName ?? "-"
-              }
-            />
-            <DetailField
-              label="Size"
-              value={device?.deviceSize ? `${device.deviceSize} inch` : "-"}
-            />
-            <DetailField label="Landmark" value={device?.landmark ?? "-"} />
-            <DetailField label="Created By" value={device?.createdBy ?? "-"} />
-            <DetailField
-              label="Created on"
-              value={formatDateTime(device?.createdAt)}
-            />
+          <div className="mt-4 rounded-2xl bg-[#F3F3F3] p-4 sm:mt-5 sm:p-5">
+            <div className="grid gap-4 sm:gap-5 md:grid-cols-2 xl:grid-cols-4">
+              <DetailField label="Brand" value={device?.brand ?? "-"} />
+              <DetailField label="Model" value={device?.model ?? "-"} />
+              <DetailField
+                label="Orientation"
+                value={device?.orientation ?? "-"}
+              />
+              <DetailField
+                label="Location"
+                value={
+                  device?.locationName ?? device?.locations?.locationName ?? "-"
+                }
+              />
+              <DetailField
+                label="Size"
+                value={device?.deviceSize ? `${device.deviceSize} inch` : "-"}
+              />
+              <DetailField label="Landmark" value={device?.landmark ?? "-"} />
+              <DetailField
+                label="Created By"
+                value={device?.createdBy ?? "-"}
+              />
+              <DetailField
+                label="Created on"
+                value={formatDateTime(device?.createdAt)}
+              />
+            </div>
+          </div>
+
+          <div className="mt-6">
+            <h3 className="text-[18px] font-semibold text-[#333333] sm:text-[20px]">
+              Device Resolution History
+            </h3>
+
+            <div className="mt-4">
+              <DataTable
+                data={sortedHistory}
+                columns={historyColumns}
+                loading={loading}
+                page={1}
+                totalPages={1}
+                sortState={sortState}
+                onPageChange={() => undefined}
+                onFilter={(key, value) => {
+                  setFilters((current) => ({
+                    ...current,
+                    [key]: value,
+                  }));
+                }}
+                onSort={(key) => {
+                  setSortState((current) => {
+                    if (current?.key !== key) {
+                      return { key, direction: "ASC" };
+                    }
+
+                    if (current.direction === "ASC") {
+                      return { key, direction: "DESC" };
+                    }
+
+                    return null;
+                  });
+                }}
+              />
+            </div>
           </div>
         </div>
-
-        <div className="mt-6">
-          <h3 className="text-[18px] font-semibold text-[#333333] sm:text-[20px]">
-            Device Resolution History
-          </h3>
-
-          <div className="mt-4">
-            <DataTable
-              data={sortedHistory}
-              columns={historyColumns}
-              loading={loading}
-              page={1}
-              totalPages={1}
-              sortState={sortState}
-              onPageChange={() => undefined}
-              onFilter={(key, value) => {
-                setFilters((current) => ({
-                  ...current,
-                  [key]: value,
-                }));
-              }}
-              onSort={(key) => {
-                setSortState((current) => {
-                  if (current?.key !== key) {
-                    return { key, direction: "ASC" };
-                  }
-
-                  if (current.direction === "ASC") {
-                    return { key, direction: "DESC" };
-                  }
-
-                  return null;
-                });
-              }}
-            />
-          </div>
-        </div>
-      </div>
       </div>
     </Modal>
   );

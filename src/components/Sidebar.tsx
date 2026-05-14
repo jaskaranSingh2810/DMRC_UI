@@ -157,7 +157,7 @@ export default function Sidebar({
 
       <aside
         className={`
-    fixed inset-y-0 left-0 z-50 h-screen overflow-y-auto bg-custom-gradient text-white transition-all duration-300
+    fixed inset-y-0 left-0 z-[999] h-screen overflow-y-auto overflow-x-visible bg-custom-gradient text-white transition-all duration-300
     md:static md:translate-x-0
     ${isMobile ? (isOpen ? "translate-x-0" : "-translate-x-full") : "translate-x-0"}
     w-64 ${isCollapsed ? "md:w-20" : "md:w-64"}
@@ -235,17 +235,19 @@ export default function Sidebar({
                 </div>
               ) : null}
 
-              <ChevronDown
-                size={28}
-                className={`ml-auto shrink-0 text-white transition ${
-                  profileMenuOpen ? "rotate-180" : ""
-                }`}
-              />
+              {!isCollapsed && (
+                <ChevronDown
+                  size={28}
+                  className={`ml-auto shrink-0 text-white transition ${
+                    profileMenuOpen ? "rotate-180" : ""
+                  }`}
+                />
+              )}
             </button>
 
-            {profileMenuOpen && !isCollapsed ? (
+            {profileMenuOpen ? (
               <div
-                className="absolute bottom-[calc(100%)] left-[3.25rem] right-4 z-50 overflow-hidden rounded-2xl border border-white/10 bg-white/20 px-4 py-4 shadow-[0_22px_44px_rgba(0,0,0,0.22)] backdrop-blur-sm"
+                className="absolute bottom-[calc(100%)] left-[3.25rem] right-4 z-[9999] overflow-hidden rounded-2xl border border-white/10 bg-white/20 px-4 py-4 shadow-[0_22px_44px_rgba(0,0,0,0.22)] backdrop-blur-sm"
                 role="menu"
               >
                 <button

@@ -171,7 +171,7 @@ export default function DataTable<T>({
                       className="border-r bg-[#E7E5F0] border-[#CDD4DA] px-3 py-3 text-left last:border-r-0 sm:px-4 sm:py-4"
                     >
                       <div className="relative flex min-w-[100px] items-center justify-between gap-2 sm:min-w-[150px]">
-                        <span className="text-xs font-semibold capitalize tracking-[0.16em] text-[#333333]">
+                        <span className="text-[10px] lg:text-[12px] xl:text-[14px] font-semibold capitalize tracking-[0.16em] text-[#333333]">
                           {col.label}
                         </span>
 
@@ -255,7 +255,7 @@ export default function DataTable<T>({
                       {columns.map((col) => (
                         <td
                           key={String(col.key)}
-                          className="whitespace-nowrap border-r border-slate-200 px-3 py-3 text-[12px] font-[400] text-[#333333] last:border-r-0 sm:px-4 sm:py-4"
+                          className="whitespace-nowrap border-r border-slate-200 px-3 py-3 text-[10px] lg:text-[12px] xl:text-[14px] font-[400] text-[#333333] last:border-r-0 sm:px-4 sm:py-4"
                         >
                           {col.render
                             ? col.render(row)
