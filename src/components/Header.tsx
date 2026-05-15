@@ -86,7 +86,11 @@ export default function Header({
     pathname.includes("/ticker-management/create") ||
     /^\/ticker-management\/[^/]+\/edit$/.test(pathname) ||
     pathname.includes("/user-management/create") ||
-    /^\/user-management\/[^/]+\/edit$/.test(pathname);
+    /^\/user-management\/[^/]+\/edit$/.test(pathname) ||
+    pathname.includes("/ads-management/create") ||
+    /^\/ads-management\/[^/]+\/edit$/.test(pathname) ||
+    pathname.includes("/notice-management/create") ||
+    /^\/notice-management\/[^/]+\/edit$/.test(pathname);
 
   const [locationMenuOpen, setLocationMenuOpen] = useState(false);
   const [moduleMenuOpen, setModuleMenuOpen] = useState(false);

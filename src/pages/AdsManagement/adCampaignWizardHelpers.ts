@@ -2,8 +2,8 @@ import type {
   CampaignMediaSlotState,
   CampaignMediaState,
   MediaOrientation,
-  MediaMode,
 } from "./adCampaignWizardTypes";
+import { buildUploadRequest } from "./adManagementApiHelpers";
 
 export function createEmptyMediaSlot(
   id: string,
@@ -72,12 +72,7 @@ export function getStepOneValidationMessage(
 export function buildDraftUploadFormData(campaign: CampaignMediaState): FormData {
   const formData = new FormData();
   const uploadedMedia = getUploadedMedia(campaign);
-  const request = {
-    contentName: campaign.name.trim(),
-    contentType: "VIDEO",
-    mediaType: getDraftMediaType(campaign),
-    isDraft: true,
-  };
+  const request = buildUploadRequest(campaign, true);
 
   formData.append(
     "request",

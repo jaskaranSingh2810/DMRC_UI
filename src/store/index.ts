@@ -3,6 +3,7 @@ import adReducer from "./slices/adSlice";
 import authReducer from "./slices/authSlice";
 import deviceReducer from "./slices/deviceSlice";
 import locationReducer from "./slices/locationSlice";
+import noticeReducer from "./slices/noticeSlice";
 import userReducer from "./slices/usersSlice";
 import uiReducer from "./slices/uiSlice";
 
@@ -12,6 +13,7 @@ export const store = configureStore({
     auth: authReducer,
     devices: deviceReducer,
     locations: locationReducer,
+    notices: noticeReducer,
     users: userReducer,
     ui: uiReducer,
   },

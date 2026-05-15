@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
   BarChart3,
@@ -23,7 +23,6 @@ import {
   createDefaultSchedule,
   createMediaSlots,
   createInitialWizardState,
-  LOCATION_OPTIONS,
   mapDraftMediaToSlots,
   WIZARD_STEPS,
 } from "./adCampaignWizardData";
@@ -36,12 +35,25 @@ import {
   getUploadedMedia,
   isStepOneReady,
 } from "./adCampaignWizardHelpers";
-import { useAppDispatch } from "@/store/hooks";
-import { fetchAdContent, saveAdDraft } from "@/store/slices/adSlice";
+import { safeFixed } from "./adManagementApiHelpers";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import {
+  assignLocationScreens,
+  clearAdForecast,
+  fetchAdContent,
+  fetchAssignedLocationScreens,
+  fetchInventoryForecast,
+  fetchLocationScreens,
+  saveAdDraft,
+  scheduleAdContent,
+  type InventoryForecastResponse,
+} from "@/store/slices/adSlice";
+import { fetchLocations } from "@/store/slices/locationSlice";
 import type {
   AdCampaignWizardProps,
   CampaignWizardState,
   DraftContentResponse,
+  LocationOption,
   MediaMode,
   ScheduleEntry,
   WizardStep,
@@ -66,9 +78,16 @@ type WizardAction =
   | { type: "REMOVE_MEDIA_SLOT"; payload: { slotId: string } }
   | { type: "SET_CONTENT_ID"; payload: string | number | null }
   | { type: "HYDRATE_DRAFT"; payload: DraftContentResponse }
+  | {
+      type: "HYDRATE_SELECTED_DEVICES";
+      payload: Record<string, string[]>;
+    }
   | { type: "TOGGLE_LOCATION"; payload: string }
   | { type: "TOGGLE_DEVICE"; payload: { locationId: string; deviceId: string } }
-  | { type: "TOGGLE_SELECT_ALL_DEVICES"; payload: { locationId: string } }
+  | {
+      type: "TOGGLE_SELECT_ALL_DEVICES";
+      payload: { locationId: string; deviceIds: Array<string | number> };
+    }
   | {
       type: "UPDATE_SCHEDULE";
       payload: {
@@ -181,14 +200,23 @@ function wizardReducer(
         },
       };
     }
+    case "HYDRATE_SELECTED_DEVICES":
+      return {
+        ...state,
+        locations: {
+          selectedDevices: {
+            ...state.locations.selectedDevices,
+            ...action.payload,
+          },
+        },
+      };
     case "TOGGLE_LOCATION": {
       const locationId = action.payload;
       const nextSelectedDevices = { ...state.locations.selectedDevices };
-      const location = LOCATION_OPTIONS.find((item) => item.id === locationId);
 
       if (nextSelectedDevices[locationId]) {
         delete nextSelectedDevices[locationId];
-      } else if (location) {
+      } else {
         nextSelectedDevices[locationId] = [];
       }
 
@@ -226,18 +254,17 @@ function wizardReducer(
       };
     }
     case "TOGGLE_SELECT_ALL_DEVICES": {
-      const { locationId } = action.payload;
-      const location = LOCATION_OPTIONS.find((item) => item.id === locationId);
+      const { locationId, deviceIds } = action.payload;
 
-      if (!location || !state.locations.selectedDevices[locationId]) {
+      if (!state.locations.selectedDevices[locationId]) {
         return state;
       }
 
       const currentlySelected = state.locations.selectedDevices[locationId];
       const nextDevices =
-        currentlySelected.length === location.devices.length
+        currentlySelected.length === deviceIds.length
           ? []
-          : location.devices.map((device) => device.id);
+          : deviceIds.map(String);
 
       return {
         ...state,
@@ -347,16 +374,48 @@ export default function AdCampaignWizard({ initialAd }: AdCampaignWizardProps) {
   const appDispatch = useAppDispatch();
   const navigate = useNavigate();
   const toast = useToast();
+  const { items: locationItems, listLoaded: locationsLoaded } = useAppSelector(
+    (state) => state.locations,
+  );
+  const { screensByLocation, assignedScreensByLocation, forecast } =
+    useAppSelector((state) => state.ads);
   const [state, dispatch] = useReducer(
     wizardReducer,
     createInitialWizardState(initialAd),
   );
   const [draftSaving, setDraftSaving] = useState(false);
   const [draftLoading, setDraftLoading] = useState(false);
+  const [publishing, setPublishing] = useState(false);
   const [expandedLocationId, setExpandedLocationId] = useState<string | null>(
     Object.keys(state.locations.selectedDevices)[0] ?? null,
   );
   const uploadedMediaRef = useRef(state.campaign.uploadedMedia);
+
+  useEffect(() => {
+    if (!locationsLoaded) {
+      void appDispatch(fetchLocations());
+    }
+  }, [appDispatch, locationsLoaded]);
+
+  const locationOptions = useMemo<LocationOption[]>(
+    () =>
+      locationItems.map((location) => {
+        const locationId = String(location.locationId);
+        const devices = screensByLocation[locationId] ?? [];
+
+        return {
+          id: locationId,
+          apiLocationId: location.locationId,
+          name: location.locationName,
+          devices: devices.map((device) => ({
+            ...device,
+            id: device.id,
+            name: device.deviceCode,
+          })),
+        };
+      }),
+    [locationItems, screensByLocation],
+  );
 
   useEffect(() => {
     dispatch({ type: "SYNC_SCHEDULE" });
@@ -419,17 +478,89 @@ export default function AdCampaignWizard({ initialAd }: AdCampaignWizardProps) {
       .finally(() => {
         setDraftLoading(false);
       });
-    // Intentionally keyed only to the route-provided draft id.
-    // Refetch after save is handled explicitly in handleSaveDraft.
   }, [appDispatch, initialAd?.contentId]);
+
+  useEffect(() => {
+    locationItems.forEach((location) => {
+      if (
+        !screensByLocation[String(location.locationId)] &&
+        state.locations.selectedDevices[String(location.locationId)]
+      ) {
+        void appDispatch(fetchLocationScreens(location.locationId));
+      }
+    });
+  }, [
+    appDispatch,
+    locationItems,
+    screensByLocation,
+    state.locations.selectedDevices,
+  ]);
+
+  useEffect(() => {
+    if (!initialAd?.locations?.length) {
+      return;
+    }
+
+    initialAd.locations.forEach((location) => {
+      const locationId = location.locationId;
+
+      if (locationId == null) {
+        return;
+      }
+
+      void appDispatch(fetchLocationScreens(locationId));
+      void appDispatch(fetchAssignedLocationScreens(locationId))
+        .unwrap()
+        .then((response) => {
+          const assignedDeviceIds = [
+            ...response.data.portraitScreens,
+            ...response.data.landscapeScreens,
+          ].map((device) => String(device.id));
+
+          dispatch({
+            type: "HYDRATE_SELECTED_DEVICES",
+            payload: {
+              [String(locationId)]: assignedDeviceIds,
+            },
+          });
+        })
+        .catch(() => {});
+    });
+  }, [appDispatch, initialAd?.locations]);
+
+  useEffect(() => {
+    const contentId = state.campaign.contentId;
+
+    if (!contentId || !isStepThreeValid(state)) {
+      void appDispatch(clearAdForecast());
+      return;
+    }
+
+    void appDispatch(
+      fetchInventoryForecast({
+        contentId,
+        locations: locationOptions.filter(
+          (location) => state.locations.selectedDevices[location.id],
+        ),
+        schedule: state.schedule,
+        selectedDevices: state.locations.selectedDevices,
+      }),
+    );
+  }, [
+    appDispatch,
+    locationOptions,
+    state.campaign.contentId,
+    state.locations.selectedDevices,
+    state.schedule,
+  ]);
 
   const selectedLocationIds = Object.keys(state.locations.selectedDevices);
   const selectedLocations = useMemo(
     () =>
-      LOCATION_OPTIONS.filter((location) =>
+      locationOptions.filter((location) =>
         selectedLocationIds.includes(location.id),
       ),
-    [selectedLocationIds],
+    [locationOptions, selectedLocationIds],
   );
 
   const totalSelectedDevices = selectedLocationIds.reduce(
@@ -538,14 +669,32 @@ export default function AdCampaignWizard({ initialAd }: AdCampaignWizardProps) {
     setDraftSaving(true);
 
     try {
-      const savedDraft = await appDispatch(
-        saveAdDraft(state.campaign),
-      ).unwrap();
-      dispatch({ type: "SET_CONTENT_ID", payload: savedDraft.contentId });
-      const hydratedDraft = await appDispatch(
-        fetchAdContent(savedDraft.contentId),
-      ).unwrap();
-      dispatch({ type: "HYDRATE_DRAFT", payload: hydratedDraft });
+      const hasNewUploads = state.campaign.uploadedMedia.some(
+        (media) => media.file instanceof File,
+      );
+      const savedContentId =
+        state.campaign.contentId && !hasNewUploads
+          ? state.campaign.contentId
+          : (await appDispatch(saveAdDraft(state.campaign)).unwrap()).contentId;
+
+      dispatch({ type: "SET_CONTENT_ID", payload: savedContentId });
+
+      if (state.step >= 2 && selectedLocations.length) {
+        await appDispatch(
+          assignLocationScreens({
+            contentId: savedContentId,
+            locations: selectedLocations,
+            selectedDevices: state.locations.selectedDevices,
+          }),
+        ).unwrap();
+      }
+
+      if (!state.campaign.contentId || hasNewUploads) {
+        const hydratedDraft = await appDispatch(
+          fetchAdContent(savedContentId),
+        ).unwrap();
+        dispatch({ type: "HYDRATE_DRAFT", payload: hydratedDraft });
+      }
       toast.success("Content upload successfully", "Ad");
     } catch (error) {
       toast.error(
@@ -566,6 +715,35 @@ export default function AdCampaignWizard({ initialAd }: AdCampaignWizardProps) {
       return;
     }
 
+    if (
+      state.step === 2 &&
+      state.campaign.contentId &&
+      selectedLocations.length
+    ) {
+      void appDispatch(
+        assignLocationScreens({
+          contentId: state.campaign.contentId,
+          locations: selectedLocations,
+          selectedDevices: state.locations.selectedDevices,
+        }),
+      )
+        .unwrap()
+        .then(() => {
+          dispatch({ type: "SET_STEP", payload: 3 });
+        })
+        .catch((error) => {
+          toast.error(
+            typeof error === "string"
+              ? error
+              : error instanceof Error
+                ? error.message
+                : "Unable to save location screens.",
+            "Ad",
+          );
+        });
+      return;
+    }
+
     dispatch({ type: "SET_STEP", payload: (state.step + 1) as WizardStep });
   };
 
@@ -578,6 +756,38 @@ export default function AdCampaignWizard({ initialAd }: AdCampaignWizardProps) {
     dispatch({ type: "SET_STEP", payload: (state.step - 1) as WizardStep });
   };
 
+  const handlePublish = async () => {
+    if (!state.campaign.contentId) {
+      toast.error("Save the campaign draft before publishing.", "Ad");
+      return;
+    }
+
+    setPublishing(true);
+
+    try {
+      await appDispatch(
+        scheduleAdContent({
+          contentId: state.campaign.contentId,
+          locations: selectedLocations,
+          schedule: state.schedule,
+          publish: true,
+        }),
+      ).unwrap();
+      dispatch({ type: "PUBLISH" });
+    } catch (error) {
+      toast.error(
+        typeof error === "string"
+          ? error
+          : error instanceof Error
+            ? error.message
+            : "Unable to publish campaign.",
+        "Ad",
+      );
+    } finally {
+      setPublishing(false);
+    }
+  };
+
   if (state.published) {
     return (
       <WizardShell
@@ -586,15 +796,13 @@ export default function AdCampaignWizard({ initialAd }: AdCampaignWizardProps) {
         totalSelectedDevices={totalSelectedDevices}
         onBack={goBack}
       >
+        <StepIndicator
+          currentStep={4}
+          isEditMode={state.isEditMode}
+          canReachStep={canReachStep}
+          onStepClick={(step) => dispatch({ type: "SET_STEP", payload: step })}
+        />
         <div className="rounded-[24px] border border-slate-200 bg-white px-6 py-20 shadow-sm">
-          <StepIndicator
-            currentStep={4}
-            isEditMode={state.isEditMode}
-            canReachStep={canReachStep}
-            onStepClick={(step) =>
-              dispatch({ type: "SET_STEP", payload: step })
-            }
-          />
           <div className="flex min-h-[420px] flex-col items-center justify-center text-center">
             <div className="flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg shadow-emerald-200">
               <Check className="h-10 w-10" />
@@ -647,6 +855,7 @@ export default function AdCampaignWizard({ initialAd }: AdCampaignWizardProps) {
 
             {state.step === 2 ? (
               <Step2LocationScreens
+                locations={locationOptions}
                 selectedDevices={state.locations.selectedDevices}
                 expandedLocationId={expandedLocationId}
                 onExpandLocation={setExpandedLocationId}
@@ -662,7 +871,13 @@ export default function AdCampaignWizard({ initialAd }: AdCampaignWizardProps) {
                 onToggleSelectAll={(locationId) =>
                   dispatch({
                     type: "TOGGLE_SELECT_ALL_DEVICES",
-                    payload: { locationId },
+                    payload: {
+                      locationId,
+                      deviceIds:
+                        locationOptions
+                          .find((location) => location.id === locationId)
+                          ?.devices.map((device) => device.id) ?? [],
+                    },
                   })
                 }
               />
@@ -685,7 +900,8 @@ export default function AdCampaignWizard({ initialAd }: AdCampaignWizardProps) {
               <Step4Submit
                 state={state}
                 selectedLocations={selectedLocations}
-                onPublish={() => dispatch({ type: "PUBLISH" })}
+                publishing={publishing}
+                onPublish={() => void handlePublish()}
               />
             ) : null}
 
@@ -708,6 +924,7 @@ export default function AdCampaignWizard({ initialAd }: AdCampaignWizardProps) {
                   selectedLocations={selectedLocations}
                   selectedDevices={state.locations.selectedDevices}
                   schedule={state.schedule}
+                  forecast={forecast}
                   compact={false}
                 />
               ) : (
@@ -717,6 +934,7 @@ export default function AdCampaignWizard({ initialAd }: AdCampaignWizardProps) {
                     selectedLocations={selectedLocations}
                     selectedDevices={state.locations.selectedDevices}
                     schedule={state.schedule}
+                    forecast={forecast}
                     compact={state.step >= 2}
                   />
                 </div>
@@ -738,23 +956,30 @@ function WizardShell({
 }: {
   children: React.ReactNode;
   state: CampaignWizardState;
-  selectedLocations: typeof LOCATION_OPTIONS;
+  selectedLocations: LocationOption[];
   totalSelectedDevices: number;
   onBack: () => void;
 }) {
+  const navigate = useNavigate();
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-2 text-sm text-[#333333]">
-        <span className="text-[24px] font-[400]">Ad Management</span>
-        <ChevronRight className="h-6 w-6" />
-        <span className="font-semibold text-[#333333] text-[24px]">
-          Create New Ad
+        <span
+          className="text-[24px] font-[400] cursor-pointer"
+          onClick={() => navigate("/ads-management")}
+        >
+          Ad Management
         </span>
+        <ChevronRight className="h-6 w-6" />
         {state.isEditMode ? (
-          <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-semibold text-violet-700">
-            Edit mode
+          <span className="font-semibold text-[#333333] text-[24px]">
+            Edit Details
           </span>
-        ) : null}
+        ) : (
+          <span className="font-semibold text-[#333333] text-[24px]">
+            Create New Content
+          </span>
+        )}
       </div>
 
       {children}
@@ -911,11 +1136,13 @@ export function InventoryForecastPanel({
   selectedLocations,
   selectedDevices,
   schedule,
+  forecast,
   compact,
 }: {
-  selectedLocations: typeof LOCATION_OPTIONS;
+  selectedLocations: LocationOption[];
   selectedDevices: Record<string, string[]>;
   schedule: Record<string, ScheduleEntry>;
+  forecast: InventoryForecastResponse | null;
   compact: boolean;
 }) {
   if (!selectedLocations.length) {
@@ -937,23 +1164,34 @@ export function InventoryForecastPanel({
     );
   }
 
+  if (!forecast) {
+    return (
+      <div className="rounded-[18px] border border-[#E8E1EE] bg-white p-5 shadow-sm">
+        <div className="flex items-center gap-2 text-base font-semibold text-[#333333]">
+          <BarChart3 className="h-5 w-5 text-violet-700" />
+          <h3>Inventory Forecast</h3>
+        </div>
+        <div className="flex min-h-[260px] flex-col items-center justify-center text-center text-[#333333]">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 text-[#333333]">
+            <BarChart3 className="h-8 w-8" />
+          </div>
+          <p className="mt-5 max-w-xs text-sm leading-6">
+            Save a draft and complete screen selection plus schedule details to
+            fetch the forecast.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   const totalTargetPlays = selectedLocations.reduce(
-    (sum, location) => sum + (schedule[location.id]?.targetPlays ?? 100),
+    (sum, location) => sum + (schedule[location.id]?.targetPlays ?? 0),
     0,
   );
-  const totalSelectedDevices = selectedLocations.reduce(
-    (sum, location) => sum + (selectedDevices[location.id]?.length ?? 0),
-    0,
+  const totalSelectedDevices = forecast.totalScreens;
+  const utilisationPercentage = Number(
+    safeFixed(forecast.overallUtilization, 4),
   );
-  const totalCapacityHours = totalSelectedDevices * 252;
-  const totalRequiredHours = Number((totalTargetPlays / 120).toFixed(2));
-  const utilisationPercentage =
-    totalCapacityHours > 0
-      ? Math.min(
-          100,
-          Number(((totalRequiredHours / totalCapacityHours) * 100).toFixed(1)),
-        )
-      : 0;
 
   return (
     <div className="space-y-4 rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
@@ -966,14 +1204,18 @@ export function InventoryForecastPanel({
 
       {selectedLocations.map((location) => {
         const selectedCount = selectedDevices[location.id]?.length ?? 0;
-        const capacityHours = selectedCount * 315;
-        const requiredHours = Number(
-          (
-            ((schedule[location.id]?.targetPlays ?? 100) *
-              Math.max(selectedCount, 1)) /
-            1440
-          ).toFixed(2),
-        );
+        const terminalForecast =
+          forecast.terminals.find(
+            (terminal) =>
+              String(terminal.locationId) ===
+              String(location.apiLocationId ?? location.id),
+          ) ?? null;
+        const capacityHours = terminalForecast?.capacityHours ?? 0;
+        const requiredHours = terminalForecast?.requiredHours ?? 0;
+        const availableHours = terminalForecast?.availableHours ?? 0;
+        const locationUtilization = terminalForecast
+          ? Number(safeFixed(terminalForecast.utilizationPercentage, 4))
+          : 0;
 
         return (
           <div
@@ -989,16 +1231,7 @@ export function InventoryForecastPanel({
                 </span>
               </div>
               <span className="text-sm font-semibold text-emerald-600">
-                {Math.min(
-                  100,
-                  Number(
-                    (
-                      (requiredHours / Math.max(capacityHours, 1)) *
-                      100
-                    ).toFixed(1),
-                  ),
-                )}
-                %
+                {locationUtilization}%
               </span>
             </div>
 
@@ -1006,15 +1239,7 @@ export function InventoryForecastPanel({
               <div
                 className="h-full rounded-full bg-emerald-500"
                 style={{
-                  width: `${Math.min(
-                    100,
-                    Number(
-                      (
-                        (requiredHours / Math.max(capacityHours, 1)) *
-                        100
-                      ).toFixed(1),
-                    ),
-                  )}%`,
+                  width: `${Math.min(100, locationUtilization)}%`,
                 }}
               />
             </div>
@@ -1026,22 +1251,36 @@ export function InventoryForecastPanel({
             >
               <ForecastStat
                 label="Capacity"
-                value={`${capacityHours.toFixed(1)}h`}
+                value={`${safeFixed(capacityHours, 1)}h`}
               />
               <ForecastStat
                 label="Available"
-                value={`${Math.max(capacityHours - requiredHours, 0).toFixed(1)}h`}
+                value={`${safeFixed(availableHours, 1)}h`}
               />
               <ForecastStat
                 label="Required"
-                value={`${requiredHours.toFixed(2)}h`}
+                value={`${safeFixed(requiredHours, 2)}h`}
               />
               <ForecastStat
                 label="Campaign Days"
                 value={String(getCampaignDays(schedule[location.id]))}
               />
-              <ForecastStat label="Daily Window" value="10h" />
-              <ForecastStat label="Interval" value="136080s" />
+              <ForecastStat
+                label="Daily Window"
+                value={
+                  schedule[location.id]
+                    ? `${Math.max(
+                        0,
+                        Number(schedule[location.id].endTime.split(":")[0]) -
+                          Number(schedule[location.id].startTime.split(":")[0]),
+                      )}h`
+                    : "0h"
+                }
+              />
+              <ForecastStat
+                label="Interval"
+                value={`${terminalForecast?.pacingIntervalSeconds ?? 0}s`}
+              />
             </div>
           </div>
         );
@@ -1058,7 +1297,7 @@ export function InventoryForecastPanel({
             <p>
               {totalSelectedDevices} screens &nbsp; {totalTargetPlays} Plays
             </p>
-            <p>{totalRequiredHours.toFixed(2)}h required</p>
+            <p>{safeFixed(forecast.totalRequiredHours, 4)}h required</p>
           </div>
         </div>
 
@@ -1073,7 +1312,7 @@ export function InventoryForecastPanel({
           />
           <SummaryRow
             label="Total Required Time"
-            value={`${totalRequiredHours.toFixed(2)}h`}
+            value={`${safeFixed(forecast.totalRequiredHours, 4)}h`}
           />
           <SummaryRow
             label="Overall Utilisation"
@@ -1113,6 +1352,7 @@ function SummaryRow({
 }
 
 export function Step2LocationScreens({
+  locations,
   selectedDevices,
   expandedLocationId,
   onExpandLocation,
@@ -1120,6 +1360,7 @@ export function Step2LocationScreens({
   onToggleDevice,
   onToggleSelectAll,
 }: {
+  locations: LocationOption[];
   selectedDevices: Record<string, string[]>;
   expandedLocationId: string | null;
   onExpandLocation: (locationId: string | null) => void;
@@ -1153,7 +1394,7 @@ export function Step2LocationScreens({
         </div>
 
         <div className="mt-6 flex flex-wrap gap-3">
-          {LOCATION_OPTIONS.map((location) => {
+          {locations.map((location) => {
             const isSelected = Boolean(selectedDevices[location.id]);
 
             return (
@@ -1193,88 +1434,92 @@ export function Step2LocationScreens({
 
         <div className="mt-6 space-y-4">
           {selectedLocationIds.length ? (
-            LOCATION_OPTIONS.filter((location) =>
-              selectedLocationIds.includes(location.id),
-            ).map((location) => {
-              const isExpanded = expandedLocationId === location.id;
-              const allSelected =
-                selectedDevices[location.id]?.length ===
-                location.devices.length;
+            locations
+              .filter((location) => selectedLocationIds.includes(location.id))
+              .map((location) => {
+                const isExpanded = expandedLocationId === location.id;
+                const allSelected =
+                  selectedDevices[location.id]?.length ===
+                  location.devices.length;
 
-              return (
-                <div
-                  key={location.id}
-                  className="rounded-[24px] border border-[#D1D5DC] bg-white"
-                >
-                  <button
-                    type="button"
-                    onClick={() =>
-                      onExpandLocation(isExpanded ? null : location.id)
-                    }
-                    className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left"
+                return (
+                  <div
+                    key={location.id}
+                    className="rounded-[24px] border border-[#D1D5DC] bg-white"
                   >
-                    <div className="flex gap-2 items-center">
-                      <Monitor className="h-5 w-5 text-[#333333]" />
-                      <div>
-                        <p className="text-[14px] font-medium text-[#333333]">
-                          {location.name}
-                        </p>
-                        <p className="text-[12px] text-[#566272]">
-                          {location.devices.length} Screens
-                        </p>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onExpandLocation(isExpanded ? null : location.id)
+                      }
+                      className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left"
+                    >
+                      <div className="flex gap-2 items-center">
+                        <Monitor className="h-5 w-5 text-[#333333]" />
+                        <div>
+                          <p className="text-[14px] font-medium text-[#333333]">
+                            {location.name}
+                          </p>
+                          <p className="text-[12px] text-[#566272]">
+                            {location.devices.length} Screens
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="rounded-full bg-[#5E1B7F] px-3 py-1 text-[14px] font-medium text-white">
-                        {selectedDevices[location.id]?.length}/
-                        {location.devices.length} Selected
-                      </span>
-                      <ChevronDown
-                        className={`h-5 w-5 text-[#333333] transition ${
-                          isExpanded ? "rotate-180" : ""
-                        }`}
-                      />
-                    </div>
-                  </button>
-
-                  {isExpanded ? (
-                    <div className="border-t border-slate-200 px-5 py-4">
-                      <label className="flex items-center gap-3 text-sm font-medium text-[#333333]">
-                        <input
-                          type="checkbox"
-                          checked={allSelected}
-                          onChange={() => onToggleSelectAll(location.id)}
-                          className="h-4 w-4 rounded-sm  accent-[#5E1B7F] p-2 focus:ring-[#5E1B7F]"
+                      <div className="flex items-center gap-3">
+                        <span className="rounded-full bg-[#5E1B7F] px-3 py-1 text-[14px] font-medium text-white">
+                          {selectedDevices[location.id]?.length}/
+                          {location.devices.length} Selected
+                        </span>
+                        <ChevronDown
+                          className={`h-5 w-5 text-[#333333] transition ${
+                            isExpanded ? "rotate-180" : ""
+                          }`}
                         />
-                        Select all
-                      </label>
+                      </div>
+                    </button>
 
-                      <ScreenSection
-                        title="Portrait Screens"
-                        devices={location.devices.filter(
-                          (device, index) => index % 2 === 0,
-                        )}
-                        locationId={location.id}
-                        searchTerm={searchTerm}
-                        selectedDevices={selectedDevices}
-                        onToggleDevice={onToggleDevice}
-                      />
-                      <hr className="w-full lg:mt-8 md:mt-6 mt-4 h-2 text-[#E2E4EA]"></hr>
-                      <ScreenSection
-                        title="Landscape Screens"
-                        devices={location.devices.filter(
-                          (device, index) => index % 2 !== 0,
-                        )}
-                        locationId={location.id}
-                        searchTerm={searchTerm}
-                        selectedDevices={selectedDevices}
-                        onToggleDevice={onToggleDevice}
-                      />
-                    </div>
-                  ) : null}
-                </div>
-              );
-            })
+                    {isExpanded ? (
+                      <div className="border-t border-slate-200 px-5 py-4">
+                        <label className="flex items-center gap-3 text-sm font-medium text-[#333333]">
+                          <input
+                            type="checkbox"
+                            checked={allSelected}
+                            onChange={() => onToggleSelectAll(location.id)}
+                            className="h-4 w-4 rounded-sm  accent-[#5E1B7F] p-2 focus:ring-[#5E1B7F]"
+                          />
+                          Select all
+                        </label>
+
+                        <ScreenSection
+                          title="Portrait Screens"
+                          devices={location.devices.filter(
+                            (device) =>
+                              String(device.orientation).toLowerCase() ===
+                              "portrait",
+                          )}
+                          locationId={location.id}
+                          searchTerm={searchTerm}
+                          selectedDevices={selectedDevices}
+                          onToggleDevice={onToggleDevice}
+                        />
+                        <hr className="w-full lg:mt-8 md:mt-6 mt-4 h-2 text-[#E2E4EA]"></hr>
+                        <ScreenSection
+                          title="Landscape Screens"
+                          devices={location.devices.filter(
+                            (device) =>
+                              String(device.orientation).toLowerCase() ===
+                              "landscape",
+                          )}
+                          locationId={location.id}
+                          searchTerm={searchTerm}
+                          selectedDevices={selectedDevices}
+                          onToggleDevice={onToggleDevice}
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })
           ) : (
             <div className="rounded-[24px] border border-dashed border-slate-300 px-6 py-12 text-center text-[#333333]">
               Select at least one location to view and choose its devices.
@@ -1291,7 +1536,7 @@ export function Step3ScheduleTarget({
   schedule,
   onScheduleChange,
 }: {
-  selectedLocations: typeof LOCATION_OPTIONS;
+  selectedLocations: LocationOption[];
   schedule: Record<string, ScheduleEntry>;
   onScheduleChange: (
     locationId: string,
@@ -1499,7 +1744,7 @@ export function Step3ScheduleTarget({
                       </Field>
                     </div>
 
-                    <div className="mt-5">
+                    {/* <div className="mt-5">
                       <p className="text-sm font-medium text-slate-600">
                         Time Slots
                       </p>
@@ -1513,7 +1758,7 @@ export function Step3ScheduleTarget({
                           </span>
                         ))}
                       </div>
-                    </div>
+                    </div> */}
                   </div>
                 ) : null}
               </div>
@@ -1538,14 +1783,16 @@ function ScreenSection({
   onToggleDevice,
 }: {
   title: string;
-  devices: (typeof LOCATION_OPTIONS)[number]["devices"];
+  devices: LocationOption["devices"];
   locationId: string;
   searchTerm: string;
   selectedDevices: Record<string, string[]>;
   onToggleDevice: (locationId: string, deviceId: string) => void;
 }) {
   const filteredDevices = devices.filter((device) =>
-    device.name.toLowerCase().includes(searchTerm.toLowerCase().trim()),
+    `${device.deviceCode} ${device.brand} ${device.model} ${device.landmark ?? ""}`
+      .toLowerCase()
+      .includes(searchTerm.toLowerCase().trim()),
   );
 
   if (!filteredDevices.length) {
@@ -1569,9 +1816,11 @@ function ScreenSection({
         </div>
       </div>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {filteredDevices.map((device, index) => {
-          const isSelected = selectedDevices[locationId]?.includes(device.id);
-          const isWorking = index % 2 !== 1;
+        {filteredDevices.map((device) => {
+          const isSelected = selectedDevices[locationId]?.includes(
+            String(device.id),
+          );
+          const isWorking = String(device.status).toLowerCase() === "active";
 
           return (
             <label
@@ -1584,24 +1833,28 @@ function ScreenSection({
             >
               <div className="flex items-center gap-2">
                 <input
-                  aria-label={`Select ${device.name}`}
+                  aria-label={`Select ${device.deviceCode}`}
                   type="checkbox"
                   checked={isSelected}
-                  onChange={() => onToggleDevice(locationId, device.id)}
+                  onChange={() => onToggleDevice(locationId, String(device.id))}
                   className="h-4 w-4 rounded-sm  accent-[#5E1B7F] p-2 focus:ring-[#5E1B7F]"
                 />
                 <span className="truncate font-medium text-[#333333]">
-                  {device.name.split("_")[0].toLowerCase()}
+                  {device.deviceCode}
                 </span>
               </div>
               <div className="flex flex-wrap gap-2 text-[11px] text-[#6A7282]">
-                <span className="rounded-full bg-white px-2 py-1">Samsung</span>
                 <span className="rounded-full bg-white px-2 py-1">
-                  {device.name.match(/\d+\s*inch/i)?.[0] ?? "70 inch"}
+                  {device.brand}
+                </span>
+                <span className="rounded-full bg-white px-2 py-1">
+                  {device.deviceSize
+                    ? `${device.deviceSize} inch`
+                    : device.model}
                 </span>
               </div>
               <span className="rounded-full bg-white px-2 py-1 text-center text-[11px] text-[#6A7282]">
-                Pillar 24
+                {device.landmark || "No landmark"}
               </span>
             </label>
           );
@@ -1614,10 +1867,12 @@ function ScreenSection({
 export function Step4Submit({
   state,
   selectedLocations,
+  publishing,
   onPublish,
 }: {
   state: CampaignWizardState;
-  selectedLocations: typeof LOCATION_OPTIONS;
+  selectedLocations: LocationOption[];
+  publishing: boolean;
   onPublish: () => void;
 }) {
   return (
@@ -1678,14 +1933,14 @@ export function Step4Submit({
                         .filter((device) =>
                           state.locations.selectedDevices[
                             location.id
-                          ]?.includes(device.id),
+                          ]?.includes(String(device.id)),
                         )
                         .map((device) => (
                           <span
                             key={device.id}
                             className="rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-600"
                           >
-                            {device.name}
+                            {device.deviceCode}
                           </span>
                         ))}
                     </div>
@@ -1733,9 +1988,10 @@ export function Step4Submit({
             <button
               type="button"
               onClick={onPublish}
+              disabled={publishing}
               className="w-full rounded-2xl bg-custom-gradient px-5 py-4 text-base font-semibold text-white shadow-lg shadow-violet-200 transition hover:opacity-95"
             >
-              Publish Campaign
+              {publishing ? "Publishing..." : "Publish Campaign"}
             </button>
           </div>
         </div>

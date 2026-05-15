@@ -151,12 +151,96 @@ export interface Ticker {
 
 export interface Notice {
   noticeId: string | number;
-  title: string;
+  title?: string;
+  announcementName?: string;
   description: string;
-  priority: NoticePriority | string;
+  priority?: NoticePriority | string;
   status: EntityStatus | string;
+  themeId?: string | null;
+  createdBy?: string;
+  publishedOn?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  updatedBy?: string | null;
+  deleted?: boolean;
   startDate?: string | null;
   endDate?: string | null;
+  startTime?: string | null;
+  endTime?: string | null;
+  locations?: AdLocation[];
+  locationName?: string;
+}
+
+export interface NoticeThemePalette {
+  primary: string;
+  secondary: string;
+  accent: string;
+  text: string;
+  panel: string;
+}
+
+export interface NoticeThemeOption {
+  id: string;
+  label: string;
+  category: string;
+  palette: NoticeThemePalette;
+}
+
+export type NoticeStatusFilter = "all" | "live" | "expired";
+
+export interface NoticeSortCriteria {
+  field: string;
+  direction: "ASC" | "DESC";
+}
+
+export interface NoticeListRequest {
+  page: number;
+  size: number;
+  sortCriteria?: NoticeSortCriteria[];
+  filters?: Record<string, string>;
+  statusFilter?: NoticeStatusFilter;
+}
+
+export interface PaginatedNotices {
+  content: Notice[];
+  currentPage: number;
+  totalPages: number;
+  totalElements: number;
+  pageSize: number;
+  isFirst: boolean;
+  isLast: boolean;
+}
+
+export interface NoticeStats {
+  total: number;
+  live: number;
+  expired: number;
+}
+
+export interface NoticeMutationPayload {
+  announcementName: string;
+  description: string;
+  locationIds: Array<string | number>;
+  themeId: string;
+  startDate: string;
+  endDate: string;
+  startTime: string;
+  endTime: string;
+  status: string;
+  userName: string;
+}
+
+export interface NoticeMutationFormValues {
+  announcementName: string;
+  description: string;
+  selectedLocationIds: string[];
+  themeId: string;
+  startDate: string;
+  endDate: string;
+  startTime: string;
+  endTime: string;
+  status: string;
+  userName: string;
 }
 
 export interface AdLocation {

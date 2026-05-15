@@ -8,9 +8,10 @@ import type { SidebarMenuItem } from "@/types";
 
 interface MenuItem {
   label: string;
-  path: string[];
-  icon: string;
+  path?: string[];
+  icon?: string;
   permission?: string;
+  children?: MenuItem[];
 }
 
 interface User {
@@ -41,7 +42,7 @@ const routeMap: Record<string, string[]> = {
 export function mapBackendMenu(menu: SidebarMenuItem[]): MenuItem[] {
   if (!Array.isArray(menu)) return [];
 
-  return menu.flatMap((menuItem) => {
+  const mappedMenus: MenuItem[] = menu.flatMap((menuItem) => {
     const mappedPaths = routeMap[menuItem.path];
     const mappedIcon = iconMap[menuItem.icon];
 
@@ -58,6 +59,28 @@ export function mapBackendMenu(menu: SidebarMenuItem[]): MenuItem[] {
       },
     ];
   });
+
+  const adsMenu = mappedMenus.find((m) => m.path?.includes("/ads-management"));
+
+  const noticeMenu = mappedMenus.find((m) =>
+    m.path?.includes("/notice-management"),
+  );
+
+  const remainingMenus = mappedMenus.filter(
+    (m) =>
+      !m.path?.includes("/ads-management") &&
+      !m.path?.includes("/notice-management"),
+  );
+
+  if (adsMenu || noticeMenu) {
+    remainingMenus.splice(1, 0, {
+      label: "Content Management",
+      icon: "/Images/Sidebar/Ad_Management.png",
+      children: [adsMenu, noticeMenu].filter(Boolean) as MenuItem[],
+    });
+  }
+
+  return remainingMenus;
 }
 
 export default function Sidebar({
@@ -125,13 +148,29 @@ export default function Sidebar({
     [user?.permissions],
   );
 
-  const filteredMenus = useMemo(
-    () =>
-      menus.filter(
-        (menu) => !menu.permission || userPermissions.has(menu.permission),
-      ),
-    [menus, userPermissions],
-  );
+  const filteredMenus = useMemo(() => {
+    return menus
+      .map((menu) => {
+        if (menu.children) {
+          return {
+            ...menu,
+            children: menu.children.filter(
+              (child) =>
+                !child.permission || userPermissions.has(child.permission),
+            ),
+          };
+        }
+
+        return menu;
+      })
+      .filter((menu) => {
+        if (menu.children) {
+          return menu.children.length > 0;
+        }
+
+        return !menu.permission || userPermissions.has(menu.permission);
+      });
+  }, [menus, userPermissions]);
 
   const handleLogout = async (): Promise<void> => {
     try {
@@ -160,7 +199,7 @@ export default function Sidebar({
     fixed inset-y-0 left-0 z-[999] h-screen overflow-y-auto overflow-x-visible bg-custom-gradient text-white transition-all duration-300
     md:static md:translate-x-0
     ${isMobile ? (isOpen ? "translate-x-0" : "-translate-x-full") : "translate-x-0"}
-    w-64 ${isCollapsed ? "md:w-20" : "md:w-64"}
+    w-[280px] ${isCollapsed ? "md:w-20" : "md:w-[280px]"}
   `}
       >
         <div className="flex h-full flex-col justify-between">
@@ -178,7 +217,9 @@ export default function Sidebar({
                 <button
                   className="hidden md:block"
                   onClick={onToggleCollapse}
-                  aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+                  aria-label={
+                    isCollapsed ? "Expand sidebar" : "Collapse sidebar"
+                  }
                 >
                   {isCollapsed ? (
                     <PanelRightOpen size={18} />
@@ -200,8 +241,8 @@ export default function Sidebar({
             <nav className="mt-4 lg:space-y-4 space-y-2 px-2">
               {filteredMenus.map((menu) => (
                 <MenuItemComponent
-                  key={`${menu.label}-${menu.path?.join("-")}`} // safer key
-                  {...menu}
+                  key={menu.label}
+                  item={menu}
                   collapsed={isCollapsed}
                   onSelect={onClose}
                 />
@@ -276,7 +317,9 @@ export default function Sidebar({
                     alt="Logout"
                     className="h-5 w-5"
                   />
-                  <span className="lg:text-[14px] text-[12px] font-medium">Logout</span>
+                  <span className="lg:text-[14px] text-[12px] font-medium">
+                    Logout
+                  </span>
                 </button>
               </div>
             ) : null}
@@ -296,36 +339,125 @@ export default function Sidebar({
 }
 
 function MenuItemComponent({
-  label,
-  path,
-  icon: Icon,
+  item,
   collapsed,
   onSelect,
-}: MenuItem & { collapsed: boolean; onSelect: () => void }) {
+  level = 0,
+}: {
+  item: MenuItem;
+  collapsed: boolean;
+  onSelect: () => void;
+  level?: number;
+}) {
   const { pathname } = useLocation();
 
-  const isActive = path.some(
+  const [submenuOpen, setSubmenuOpen] = useState(true);
+
+  const hasChildren = !!item.children?.length;
+
+  const isActive = item.path?.some(
     (p) => pathname === p || pathname.startsWith(p + "/"),
   );
 
+  const isChildActive = item.children?.some((child) =>
+    child.path?.some((p) => pathname === p || pathname.startsWith(p + "/")),
+  );
+
+  if (hasChildren) {
+    return (
+      <div className="relative">
+        <button
+          onClick={() => setSubmenuOpen((prev) => !prev)}
+          className={`
+            group relative flex w-full items-center justify-between
+            rounded-md px-4 py-3 transition-all duration-200
+            ${isChildActive ? "bg-white/15" : "hover:bg-white/10"}
+          `}
+        >
+          <div className="flex items-center gap-3">
+            <img
+              src={item.icon}
+              alt={item.label}
+              className="h-5 w-5 opacity-90"
+            />
+
+            {!collapsed && (
+              <span className="text-[15px] font-medium text-white">
+                {item.label}
+              </span>
+            )}
+          </div>
+
+          {!collapsed && (
+            <ChevronDown
+              size={18}
+              className={`transition-transform duration-300 ${
+                submenuOpen ? "rotate-180" : ""
+              }`}
+            />
+          )}
+        </button>
+
+        {!collapsed && submenuOpen ? (
+          <div className="relative ml-7 mt-2 space-y-1">
+            <div className="absolute left-[9px] top-0 h-full w-px bg-white" />
+
+            {item.children?.map((child, index) => {
+              const childActive = child.path?.some(
+                (p) => pathname === p || pathname.startsWith(p + "/"),
+              );
+
+              return (
+                <div key={child.label} className="relative pl-5">
+                  <div className="absolute left-[9px] top-1/2 h-px w-3 bg-white" />
+
+                  <NavLink
+                    to={child.path?.[0] || "#"}
+                    onClick={onSelect}
+                    className={`
+                      flex items-center gap-3 rounded-md px-3 py-2 transition-all duration-200
+                      ${childActive ? "bg-white/20 border-l-2 border-white" : "hover:bg-white/10"}
+                    `}
+                  >
+                    <img
+                      src={child.icon}
+                      alt={child.label}
+                      className="h-4 w-4 opacity-90"
+                    />
+
+                    <span className="text-[14px] text-white">
+                      {child.label}
+                    </span>
+                  </NavLink>
+                </div>
+              );
+            })}
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
   return (
     <NavLink
-      to={path[0]}
+      to={item.path?.[0] || "#"}
       onClick={onSelect}
-      className={`group relative flex items-center gap-3 rounded-lg pl-4 py-2 transition-all
+      className={`
+        group relative flex items-center gap-3 rounded-md px-4 py-3 transition-all duration-200
         ${
-          isActive
-            ? "bg-[rgba(239,_246,_255,_0.2)] border-l-2 border-white"
-            : "hover:bg-[rgba(239,_246,_255,_0.2)]"
-        }`}
+          isActive ? "bg-white/15 border-l-2 border-white" : "hover:bg-white/10"
+        }
+      `}
     >
-      <img src={Icon} alt={label} className="h-5 w-5" />
+      <img src={item.icon} alt={item.label} className="h-5 w-5 opacity-90" />
 
-      {!collapsed ? <span className="lg:text-sm text-xs">{label}</span> : null}
+      {!collapsed ? (
+        <span className="text-[14px] text-white">{item.label}</span>
+      ) : null}
 
       {collapsed ? (
-        <span className="absolute left-14 z-50 hidden whitespace-nowrap rounded bg-black px-2 py-1 lg:text-xs md:text-[12px] text-white group-hover:block">
-          {label}
+        <span className="absolute left-14 z-50 hidden whitespace-nowrap rounded bg-black px-2 py-1 text-xs text-white group-hover:block">
+          {item.label}
         </span>
       ) : null}
     </NavLink>

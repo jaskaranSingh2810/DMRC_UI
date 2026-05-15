@@ -163,6 +163,17 @@ export default function App() {
           />
 
           <Route
+            path="/notice-management/:noticeId/edit"
+            element={
+              <ProtectedRoute
+                allowedRoles={[UserRole.SUPER_ADMIN, UserRole.NOTICE_MANAGER]}
+              >
+                <CreateNotice />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
             path="/ticker-management"
             element={
               <ProtectedRoute
